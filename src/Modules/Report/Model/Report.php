@@ -15,6 +15,7 @@ use src\Modules\Report\Domain\Enum\ReportStatusEnum;
  * @property string $uuid
  * @property int $report_series_id
  * @property int|null $report_type_id
+ * @property int|null $coordination_id
  * @property int|null $previous_report_id
  * @property int $revision_number
  * @property int $created_by
@@ -44,6 +45,8 @@ class Report extends Model
             'payload' => 'array',
             'status' => ReportStatusEnum::class,
             'revision_number' => 'integer',
+            'coordination_id' => 'integer',
+            'report_type_id' => 'integer',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];

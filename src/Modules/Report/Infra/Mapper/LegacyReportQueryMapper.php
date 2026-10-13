@@ -80,6 +80,8 @@ class LegacyReportQueryMapper implements LegacyReportQueryMapperInterface
             uploadedImages: $images['uploadedImages'],
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
+            coordinationId: $model->coordination_id,
+            reportTypeId: $model->report_type_id,
         );
     }
 }

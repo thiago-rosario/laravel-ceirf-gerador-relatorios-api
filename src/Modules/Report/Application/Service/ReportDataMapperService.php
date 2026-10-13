@@ -62,6 +62,8 @@ class ReportDataMapperService implements ReportDataMapperServiceInterface
             conclusion: $this->mapConclusion($report->conclusion()),
             generatedDocument: $this->mapGeneratedDocument($report->generatedDocument()),
             uploadedImages: array_map($this->mapImage(...), $report->uploadedImages()),
+            coordinationId: $report->coordinationId(),
+            reportTypeId: $report->reportTypeId(),
         );
     }
 

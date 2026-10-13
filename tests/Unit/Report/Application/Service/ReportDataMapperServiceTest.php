@@ -66,6 +66,8 @@ test('maps incomplete draft metadata and absent sections without requiring a gen
         'conclusion' => null,
         'generatedDocument' => null,
         'uploadedImages' => [],
+        'coordinationId' => null,
+        'reportTypeId' => null,
     ]);
     expect($output->createdAt->format(DateTimeInterface::ATOM))->toBe('2020-01-01T08:00:00+00:00');
     expect($output->updatedAt->format(DateTimeInterface::ATOM))->toBe('2020-01-02T09:00:00+00:00');

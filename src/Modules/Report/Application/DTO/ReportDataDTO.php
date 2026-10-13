@@ -31,5 +31,7 @@ readonly class ReportDataDTO
         public ?ReportConclusionDataDTO $conclusion = null,
         public ?GeneratedReportDataDTO $generatedDocument = null,
         public array $uploadedImages = [],
+        public ?int $coordinationId = null,
+        public ?int $reportTypeId = null,
     ) {}
 }

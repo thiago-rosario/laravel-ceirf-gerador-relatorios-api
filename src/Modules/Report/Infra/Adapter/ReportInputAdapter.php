@@ -171,10 +171,12 @@ class ReportInputAdapter implements ReportInputAdapterInterface
         }
 
         $disk = Storage::disk('local');
+        $checksum = $disk->exists($path) ? hash_file('sha256', $disk->path($path)) : false;
         if (! $disk->exists($path)
             || $disk->size($path) !== (int) $data['size_bytes']
             || $disk->mimeType($path) !== $data['mime_type']
-            || ! hash_equals(strtolower($data['checksum']), hash_file('sha256', $disk->path($path)))) {
+            || ! is_string($checksum)
+            || ! hash_equals(strtolower($data['checksum']), $checksum)) {
             throw new InvalidReportFileReferenceException('Os metadados não correspondem ao arquivo recebido.');
         }
 

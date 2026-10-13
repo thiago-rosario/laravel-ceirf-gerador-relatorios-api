@@ -59,7 +59,8 @@ class CreateReportEloquentRepository
                 'created_by' => $authorId,
                 'report_series_id' => $seriesId,
                 'previous_report_id' => $parent?->id,
-                'report_type_id' => $parent?->report_type_id,
+                'report_type_id' => $parent === null ? $report->reportTypeId() : $parent->report_type_id,
+                'coordination_id' => $parent === null ? $report->coordinationId() : $parent->coordination_id,
             ]);
             $this->service->storeMedia($report, $model->id, $authorId, $parent?->id);
 

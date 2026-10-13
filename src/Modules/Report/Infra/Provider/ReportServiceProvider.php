@@ -11,8 +11,11 @@ use src\Modules\Report\Application\Interfaces\Adapter\ReportQueryResultAdapterIn
 use src\Modules\Report\Application\Interfaces\Mapper\LegacyReportQueryMapperInterface;
 use src\Modules\Report\Application\Interfaces\Mapper\ReportChecklistMapperInterface;
 use src\Modules\Report\Application\Interfaces\Mapper\ReportPersistenceMapperInterface;
+use src\Modules\Report\Application\Interfaces\Repository\ReportConsultationRepositoryInterface;
+use src\Modules\Report\Application\Interfaces\Service\ReportAccessServiceInterface;
 use src\Modules\Report\Application\Interfaces\Service\ReportDataMapperServiceInterface;
 use src\Modules\Report\Application\Interfaces\Service\ReportFinderServiceInterface;
+use src\Modules\Report\Application\Interfaces\Service\ReportPdfStorageInterface;
 use src\Modules\Report\Application\Interfaces\Service\ReportPersistenceServiceInterface;
 use src\Modules\Report\Application\Interfaces\Usecase\CountAllReportsUsecaseInterface;
 use src\Modules\Report\Application\Interfaces\Usecase\CountReportsByMonthUsecaseInterface;
@@ -27,6 +30,9 @@ use src\Modules\Report\Application\Interfaces\Usecase\FindReportsByUserIdAndCoor
 use src\Modules\Report\Application\Interfaces\Usecase\FindReportsByUserIdUsecaseInterface;
 use src\Modules\Report\Application\Interfaces\Usecase\GenerateReportUsecaseInterface;
 use src\Modules\Report\Application\Interfaces\Usecase\GetDashboardReportsUsecaseInterface;
+use src\Modules\Report\Application\Interfaces\Usecase\GetReportPdfUsecaseInterface;
+use src\Modules\Report\Application\Interfaces\Usecase\ListReportMunicipalitiesUsecaseInterface;
+use src\Modules\Report\Application\Interfaces\Usecase\SearchReportsUsecaseInterface;
 use src\Modules\Report\Application\Interfaces\Usecase\UpdateReportUsecaseInterface;
 use src\Modules\Report\Application\Service\ReportDataMapperService;
 use src\Modules\Report\Application\Service\ReportFinderService;
@@ -43,6 +49,9 @@ use src\Modules\Report\Application\Usecase\FindReportsByUserIdAndCoordinateIdUse
 use src\Modules\Report\Application\Usecase\FindReportsByUserIdUsecase;
 use src\Modules\Report\Application\Usecase\GenerateReportUsecase;
 use src\Modules\Report\Application\Usecase\GetDashboardReportsUsecase;
+use src\Modules\Report\Application\Usecase\GetReportPdfUsecase;
+use src\Modules\Report\Application\Usecase\ListReportMunicipalitiesUsecase;
+use src\Modules\Report\Application\Usecase\SearchReportsUsecase;
 use src\Modules\Report\Application\Usecase\UpdateReportUsecase;
 use src\Modules\Report\Domain\Repository\ReportRepositoryInterface;
 use src\Modules\Report\Infra\Adapter\ReportGeneratorAdapter;
@@ -51,7 +60,10 @@ use src\Modules\Report\Infra\Adapter\ReportQueryResultAdapter;
 use src\Modules\Report\Infra\Mapper\LegacyReportQueryMapper;
 use src\Modules\Report\Infra\Mapper\ReportChecklistMapper;
 use src\Modules\Report\Infra\Mapper\ReportPersistenceMapper;
+use src\Modules\Report\Infra\Repositories\Queries\ReportConsultationEloquentRepository;
 use src\Modules\Report\Infra\Repositories\ReportEloquentRepository;
+use src\Modules\Report\Infra\Service\ReportAccessService;
+use src\Modules\Report\Infra\Service\ReportPdfStorage;
 use src\Modules\Report\Infra\Service\ReportPersistenceService;
 
 class ReportServiceProvider extends ServiceProvider
@@ -63,6 +75,12 @@ class ReportServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->bind(ReportPdfStorageInterface::class, ReportPdfStorage::class);
+        $this->app->bind(GetReportPdfUsecaseInterface::class, GetReportPdfUsecase::class);
+        $this->app->bind(ReportAccessServiceInterface::class, ReportAccessService::class);
+        $this->app->bind(ReportConsultationRepositoryInterface::class, ReportConsultationEloquentRepository::class);
+        $this->app->bind(SearchReportsUsecaseInterface::class, SearchReportsUsecase::class);
+        $this->app->bind(ListReportMunicipalitiesUsecaseInterface::class, ListReportMunicipalitiesUsecase::class);
         $this->app->bind(ReportInputAdapterInterface::class, ReportInputAdapter::class);
         $this->app->bind(ReportRepositoryInterface::class, ReportEloquentRepository::class);
 

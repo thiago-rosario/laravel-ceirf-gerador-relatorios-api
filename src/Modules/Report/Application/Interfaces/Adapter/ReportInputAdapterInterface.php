@@ -14,6 +14,19 @@ use src\Modules\Report\Application\DTO\UpdateReportInputDTO;
  * @phpstan-type CoverInput array{municipality_id?: int|string|null, force?: string|null, size?: string|null, typology?: string|null, sei_number?: string|null}
  * @phpstan-type AttachmentsInput array{checklist?: array<string, string|null>, municipality_location_map?: AttachmentInput|null, topographic_plan?: AttachmentInput|null, others?: list<AttachmentInput>}
  * @phpstan-type ReportPayload array{
+ *     coordination_id?: int|string,
+ *     report_type_id?: int|string,
+ *     cover?: CoverInput,
+ *     general_information?: array{inspection_date?: string|null, collaborators?: string|null},
+ *     location?: array{location_map?: ImageInput|null, municipality_in_state_map?: ImageInput|null},
+ *     infrastructure?: array<string, string|null>,
+ *     pre_implementation?: array{image?: ImageInput|null},
+ *     photographic_documentation?: array{images?: list<ImageInput>},
+ *     attachments?: AttachmentsInput,
+ *     conclusion?: array{content?: string|null}
+ * }
+ * @phpstan-type ReportUpdatePayload array{
+ *     id: string,
  *     cover?: CoverInput,
  *     general_information?: array{inspection_date?: string|null, collaborators?: string|null},
  *     location?: array{location_map?: ImageInput|null, municipality_in_state_map?: ImageInput|null},
@@ -29,6 +42,6 @@ interface ReportInputAdapterInterface
     /** @param ReportPayload $data */
     public function create(array $data, string $createdBy): CreateReportInputDTO;
 
-    /** @param ReportPayload&array{id: string} $data */
+    /** @param ReportUpdatePayload $data */
     public function update(array $data): UpdateReportInputDTO;
 }

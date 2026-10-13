@@ -8,6 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use src\Modules\Identity\Domain\Enum\UserRoleEnum;
 use src\Modules\Identity\Model\User;
+use src\Modules\Report\Application\Interfaces\Service\ReportAccessServiceInterface;
 use src\Modules\Report\Domain\Enum\ChecklistAnswerEnum;
 use src\Modules\Report\Domain\Enum\ForceEnum;
 use src\Modules\Report\Domain\Enum\ReportSizeEnum;
@@ -30,11 +31,13 @@ abstract class ReportPayloadRequest extends FormRequest
         'works_dashboard_updated', 'environmental_protection_area',
     ];
 
-    public function authorize(): bool
+    public function authorize(ReportAccessServiceInterface $access): bool
     {
         /** @var User|null $user */
         $user = $this->user();
-        return $user !== null && $user->role !== UserRoleEnum::VIEWER;
+
+        return $user !== null && $user->role !== UserRoleEnum::VIEWER
+            && ($this->route('id') === null || $access->canWrite($user->uuid, (string) $this->route('id')));
     }
 
     /** @return array<string, list<string|Stringable>> */
@@ -46,6 +49,8 @@ abstract class ReportPayloadRequest extends FormRequest
             'revision_number' => ['prohibited'],
             'root_report_id' => ['prohibited'],
             'generated_document' => ['prohibited'],
+            'report_type_id' => ['prohibited'],
+            'coordination_id' => ['prohibited'],
             'cover' => ['sometimes', 'array:municipality_id,force,size,typology,sei_number'],
             'cover.municipality_id' => ['sometimes', 'nullable', 'integer', 'min:1', Rule::exists('municipalities', 'id')->where('state_code', 'BA')->where('is_active', true)],
             'cover.force' => ['sometimes', 'nullable', Rule::enum(ForceEnum::class)],
@@ -79,6 +84,7 @@ abstract class ReportPayloadRequest extends FormRequest
         foreach (['attachments.municipality_location_map', 'attachments.topographic_plan', 'attachments.others.*'] as $path) {
             $rules = [...$rules, ...$this->mediaRules($path, false)];
         }
+
         return $rules;
     }
 
@@ -103,6 +109,7 @@ abstract class ReportPayloadRequest extends FormRequest
         } else {
             $rules[$path.'.description'] = ['sometimes', 'nullable', 'string', 'max:500'];
         }
+
         return $rules;
     }
 }

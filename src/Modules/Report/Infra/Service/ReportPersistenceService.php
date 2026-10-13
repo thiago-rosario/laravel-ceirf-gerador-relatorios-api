@@ -35,6 +35,8 @@ class ReportPersistenceService implements ReportPersistenceServiceInterface
             ...$this->mapper->toAttributes($report),
             'uuid' => $report->id()->value(),
             'revision_number' => $report->revisionNumber(),
+            'coordination_id' => $report->coordinationId(),
+            'report_type_id' => $report->reportTypeId(),
             'municipality_id' => $cover?->municipality()?->id(),
             'force_id' => $forceId,
             'size_id' => $sizeId,
@@ -75,6 +77,8 @@ class ReportPersistenceService implements ReportPersistenceServiceInterface
             createdAt: $report->createdAt(),
             updatedAt: $report->updatedAt(),
             uploadedImages: array_values($history),
+            coordinationId: $report->coordinationId(),
+            reportTypeId: $report->reportTypeId(),
         );
     }
 

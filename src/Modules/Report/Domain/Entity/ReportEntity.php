@@ -74,6 +74,8 @@ class ReportEntity
         DateTimeInterface|string|null $createdAt = null,
         DateTimeInterface|string|null $updatedAt = null,
         private array $uploadedImages = [],
+        private ?int $coordinationId = null,
+        private ?int $reportTypeId = null,
     ) {
         $this->id = $this->resolveUuid($id);
         $this->rootReportId = $rootReportId === null ? $this->id : $this->resolveUuid($rootReportId);
@@ -119,6 +121,16 @@ class ReportEntity
     public function status(): ReportStatusEnum
     {
         return $this->status;
+    }
+
+    public function coordinationId(): ?int
+    {
+        return $this->coordinationId;
+    }
+
+    public function reportTypeId(): ?int
+    {
+        return $this->reportTypeId;
     }
 
     public function cover(): ?ReportCoverValueObject
@@ -342,6 +354,8 @@ class ReportEntity
             attachments: $this->attachments,
             conclusion: $this->conclusion,
             uploadedImages: $this->uploadedImages,
+            coordinationId: $this->coordinationId,
+            reportTypeId: $this->reportTypeId,
         );
     }
 
@@ -364,6 +378,13 @@ class ReportEntity
             return $legacyMapper->fromModel($model);
         }
 
-        return $mapper->fromPayload($model->payload);
+        $payload = $model->payload;
+
+        if ($model->exists) {
+            $payload['coordinationId'] = $model->coordination_id;
+            $payload['reportTypeId'] = $model->report_type_id;
+        }
+
+        return $mapper->fromPayload($payload);
     }
 }

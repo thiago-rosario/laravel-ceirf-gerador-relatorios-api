@@ -42,7 +42,9 @@ use src\Modules\Report\Infra\Trait\MapsReportPersistenceSectionsTrait;
  *     attachments: AttachmentsPayload|null,
  *     conclusion: array{content: string}|null,
  *     generatedDocument: array{storageIdentifier: string, fileName: string, generatedAt: string}|null,
- *     uploadedImages: list<ImagePayload>
+ *     uploadedImages: list<ImagePayload>,
+ *     coordinationId?: int|null,
+ *     reportTypeId?: int|null
  * }
  */
 class ReportPersistenceMapper implements ReportPersistenceMapperInterface
@@ -106,6 +108,8 @@ class ReportPersistenceMapper implements ReportPersistenceMapperInterface
             'createdBy' => $report->createdBy()->value(),
             'revisionNumber' => $report->revisionNumber(),
             'status' => $report->status()->value,
+            'coordinationId' => $report->coordinationId(),
+            'reportTypeId' => $report->reportTypeId(),
             'createdAt' => $this->date($report->createdAt()),
             'updatedAt' => $this->date($report->updatedAt()),
             'cover' => $this->toCover($report->cover()),
@@ -180,6 +184,8 @@ class ReportPersistenceMapper implements ReportPersistenceMapperInterface
             createdAt: $payload['createdAt'],
             updatedAt: $payload['updatedAt'],
             uploadedImages: array_map($this->fromImage(...), $payload['uploadedImages']),
+            coordinationId: $payload['coordinationId'] ?? null,
+            reportTypeId: $payload['reportTypeId'] ?? null,
         );
     }
 

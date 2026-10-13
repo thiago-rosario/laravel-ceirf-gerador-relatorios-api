@@ -44,6 +44,8 @@ class UpdateReportEloquentRepository
                 || $report->parentReportId()?->value() !== $previousReport->parentReportId()?->value()
                 || $report->revisionNumber() !== $previousReport->revisionNumber()
                 || $report->createdBy()->value() !== $previousReport->createdBy()->value()
+                || $report->coordinationId() !== $previousReport->coordinationId()
+                || $report->reportTypeId() !== $previousReport->reportTypeId()
                 || $report->createdAt() != $previousReport->createdAt()) {
                 throw new InvalidReportRevisionException;
             }

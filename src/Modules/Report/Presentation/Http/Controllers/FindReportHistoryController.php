@@ -6,22 +6,24 @@ namespace src\Modules\Report\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use src\Modules\Identity\Model\User;
 use src\Modules\Report\Application\DTO\FindByIdReportInputDTO;
-use src\Modules\Report\Application\DTO\FindReportHistoryInputDTO;
+use src\Modules\Report\Application\DTO\SearchReportsInputDTO;
+use src\Modules\Report\Application\Exception\ReportNotFoundException;
+use src\Modules\Report\Application\Interfaces\Service\ReportAccessServiceInterface;
 use src\Modules\Report\Application\Interfaces\Usecase\FindByIdReportUsecaseInterface;
-use src\Modules\Report\Application\Interfaces\Usecase\FindReportHistoryUsecaseInterface;
+use src\Modules\Report\Application\Interfaces\Usecase\SearchReportsUsecaseInterface;
 use src\Modules\Report\Presentation\Http\Requests\ReportIdRequest;
 use src\Modules\Report\Presentation\Resources\ReportResource;
 use src\Modules\Shared\Helper\ResponseJsend;
-
-use src\Modules\Report\Application\Exception\ReportNotFoundException;
 use Throwable;
 
 class FindReportHistoryController extends Controller
 {
     public function __construct(
-        private readonly FindReportHistoryUsecaseInterface $usecase,
+        private readonly SearchReportsUsecaseInterface $usecase,
         private readonly FindByIdReportUsecaseInterface $finder,
+        private readonly ReportAccessServiceInterface $access,
     ) {}
 
     public function __invoke(ReportIdRequest $request): JsonResponse
@@ -29,8 +31,11 @@ class FindReportHistoryController extends Controller
         try {
             $data = $request->validated();
             $report = $this->finder->__invoke(new FindByIdReportInputDTO($data['id']))->report;
-            $result = $this->usecase->__invoke(new FindReportHistoryInputDTO(rootReportId: $report->rootReportId));
-            return (new ResponseJsend(['reports' => ReportResource::collection($result->reports)->resolve($request)]))->toJsonResponse();
+            /** @var User $user */
+            $user = $request->user();
+            $result = $this->usecase->__invoke(new SearchReportsInputDTO(actorId: $user->uuid, rootReportId: $report->rootReportId));
+
+            return (new ResponseJsend(['reports' => ReportResource::collectionForReader($result->reports, $user->uuid, $this->access, $request)]))->toJsonResponse();
         } catch (ReportNotFoundException $e) {
             $response = new ResponseJsend(
                 status: ResponseJsend::STATUS_ERROR,

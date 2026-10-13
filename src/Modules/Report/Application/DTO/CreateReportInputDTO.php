@@ -43,5 +43,7 @@ readonly class CreateReportInputDTO
         public ?string $reportAttachedToSei = null,
         public ?string $worksDashboardUpdated = null,
         public ?string $environmentalProtectionArea = null,
+        public ?int $coordinationId = null,
+        public ?int $reportTypeId = null,
     ) {}
 }

@@ -35,6 +35,7 @@ use src\Modules\Report\Domain\ValueObject\SeiNumberValueObject;
 
 /**
  * @phpstan-import-type ReportPayload from ReportInputAdapterInterface
+ * @phpstan-import-type ReportUpdatePayload from ReportInputAdapterInterface
  * @phpstan-import-type CoverInput from ReportInputAdapterInterface
  * @phpstan-import-type FileInput from ReportInputAdapterInterface
  * @phpstan-import-type ImageInput from ReportInputAdapterInterface
@@ -50,20 +51,41 @@ class ReportInputAdapter implements ReportInputAdapterInterface
     {
         $sections = $this->sections($data);
 
-        return new CreateReportInputDTO(...[
-            'createdBy' => $createdBy,
-            'cover' => $sections['cover'],
-            'generalInformation' => $sections['generalInformation'],
-            'location' => $sections['location'],
-            'infrastructure' => $sections['infrastructure'],
-            'preImplementation' => $sections['preImplementation'],
-            'photographicDocumentation' => $sections['photographicDocumentation'],
-            'conclusion' => $sections['conclusion'],
-            ...$this->checklistStrings($data['attachments']['checklist'] ?? []),
-        ]);
+        return new CreateReportInputDTO(
+            createdBy: $createdBy,
+            coordinationId: isset($data['coordination_id']) ? (int) $data['coordination_id'] : null,
+            reportTypeId: isset($data['report_type_id']) ? (int) $data['report_type_id'] : null,
+            cover: $sections['cover'],
+            generalInformation: $sections['generalInformation'],
+            location: $sections['location'],
+            infrastructure: $sections['infrastructure'],
+            preImplementation: $sections['preImplementation'],
+            photographicDocumentation: $sections['photographicDocumentation'],
+            conclusion: $sections['conclusion'],
+            seiConstructionRequest: $data['attachments']['checklist']['sei_construction_request'] ?? null,
+            seiLandAndTypologyIdentification: $data['attachments']['checklist']['sei_land_and_typology_identification'] ?? null,
+            stateOwnedLand: $data['attachments']['checklist']['state_owned_land'] ?? null,
+            simovLegalized: $data['attachments']['checklist']['simov_legalized'] ?? null,
+            compatibleDimensions: $data['attachments']['checklist']['compatible_dimensions'] ?? null,
+            slopeOrLevelRisk: $data['attachments']['checklist']['slope_or_level_risk'] ?? null,
+            stormwaterDrainage: $data['attachments']['checklist']['stormwater_drainage'] ?? null,
+            floodHistory: $data['attachments']['checklist']['flood_history'] ?? null,
+            electricitySupply: $data['attachments']['checklist']['electricity_supply'] ?? null,
+            waterSupply: $data['attachments']['checklist']['water_supply'] ?? null,
+            sewageSupply: $data['attachments']['checklist']['sewage_supply'] ?? null,
+            pavingAndSidewalk: $data['attachments']['checklist']['paving_and_sidewalk'] ?? null,
+            regularWasteCollection: $data['attachments']['checklist']['regular_waste_collection'] ?? null,
+            demolitionRequired: $data['attachments']['checklist']['demolition_required'] ?? null,
+            easyPublicAccess: $data['attachments']['checklist']['easy_public_access'] ?? null,
+            domainStripOrNonBuildableArea: $data['attachments']['checklist']['domain_strip_or_non_buildable_area'] ?? null,
+            technicalFeasibilityReport: $data['attachments']['checklist']['technical_feasibility_report'] ?? null,
+            reportAttachedToSei: $data['attachments']['checklist']['report_attached_to_sei'] ?? null,
+            worksDashboardUpdated: $data['attachments']['checklist']['works_dashboard_updated'] ?? null,
+            environmentalProtectionArea: $data['attachments']['checklist']['environmental_protection_area'] ?? null,
+        );
     }
 
-    /** @param ReportPayload&array{id: string} $data */
+    /** @param ReportUpdatePayload $data */
     public function update(array $data): UpdateReportInputDTO
     {
         $report = $this->finder->findById($data['id']);
@@ -84,7 +106,7 @@ class ReportInputAdapter implements ReportInputAdapterInterface
     }
 
     /**
-     * @param ReportPayload $data
+     * @param  ReportPayload  $data
      * @return array{
      *     cover: ReportCoverValueObject|null,
      *     generalInformation: ReportGeneralInformationValueObject|null,
@@ -138,7 +160,7 @@ class ReportInputAdapter implements ReportInputAdapterInterface
     }
 
     /** @param array<string, string|null> $data
-     *  @return array<string, ChecklistAnswerEnum|null>
+     * @return array<string, ChecklistAnswerEnum|null>
      */
     private function answers(array $data): array
     {
@@ -146,6 +168,7 @@ class ReportInputAdapter implements ReportInputAdapterInterface
         foreach ($data as $field => $answer) {
             $answers[Str::camel($field)] = $answer === null ? null : ChecklistAnswerEnum::from($answer);
         }
+
         return $answers;
     }
 
@@ -171,10 +194,12 @@ class ReportInputAdapter implements ReportInputAdapterInterface
         }
 
         $disk = Storage::disk('local');
+        $checksum = $disk->exists($path) ? hash_file('sha256', $disk->path($path)) : false;
         if (! $disk->exists($path)
             || $disk->size($path) !== (int) $data['size_bytes']
             || $disk->mimeType($path) !== $data['mime_type']
-            || ! hash_equals(strtolower($data['checksum']), hash_file('sha256', $disk->path($path)))) {
+            || ! is_string($checksum)
+            || ! hash_equals(strtolower($data['checksum']), $checksum)) {
             throw new InvalidReportFileReferenceException('Os metadados não correspondem ao arquivo recebido.');
         }
 
@@ -207,17 +232,5 @@ class ReportInputAdapter implements ReportInputAdapterInterface
             description: $data['description'] ?? '',
             id: $data['id'] ?? null,
         );
-    }
-
-    /** @param array<string, string|null> $data
-     *  @return array<string, string|null>
-     */
-    private function checklistStrings(array $data): array
-    {
-        $answers = [];
-        foreach ($data as $field => $answer) {
-            $answers[Str::camel($field)] = $answer;
-        }
-        return $answers;
     }
 }

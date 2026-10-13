@@ -1,7 +1,7 @@
 <?php
 
-test('example', function () {
+test('the API only application has no root web page', function () {
     $response = $this->get('/');
 
-    $response->assertStatus(200);
+    $response->assertNotFound();
 });

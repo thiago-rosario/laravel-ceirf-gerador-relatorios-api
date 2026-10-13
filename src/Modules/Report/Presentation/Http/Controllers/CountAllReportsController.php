@@ -6,22 +6,26 @@ namespace src\Modules\Report\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
-use src\Modules\Report\Application\Interfaces\Usecase\CountAllReportsUsecaseInterface;
+use Illuminate\Http\Request;
+use src\Modules\Identity\Model\User;
+use src\Modules\Report\Application\DTO\SearchReportsInputDTO;
+use src\Modules\Report\Application\Interfaces\Usecase\SearchReportsUsecaseInterface;
 use src\Modules\Shared\Helper\ResponseJsend;
-
 use Throwable;
 
 class CountAllReportsController extends Controller
 {
     public function __construct(
-        private readonly CountAllReportsUsecaseInterface $usecase
-    ){}
+        private readonly SearchReportsUsecaseInterface $usecase
+    ) {}
 
-    public function __invoke(): JsonResponse
+    public function __invoke(Request $request): JsonResponse
     {
         try {
-            $result = $this->usecase->__invoke();
-            $response = new ResponseJsend(['count' => $result->count]);
+            /** @var User $user */
+            $user = $request->user();
+            $result = $this->usecase->__invoke(new SearchReportsInputDTO(actorId: $user->uuid, countOnly: true));
+            $response = new ResponseJsend(['count' => $result->total]);
 
             return $response->toJsonResponse();
         } catch (Throwable $e) {

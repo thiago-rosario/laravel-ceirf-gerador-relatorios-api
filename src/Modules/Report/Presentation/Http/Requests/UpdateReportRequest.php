@@ -7,10 +7,10 @@ namespace src\Modules\Report\Presentation\Http\Requests;
 use Illuminate\Validation\Validator;
 use Stringable;
 
-/** @phpstan-import-type ReportPayload from ReportPayloadRequest */
+/** @phpstan-import-type ReportUpdatePayload from \src\Modules\Report\Application\Interfaces\Adapter\ReportInputAdapterInterface */
 class UpdateReportRequest extends ReportPayloadRequest
 {
-    /** @return ($key is null ? ReportPayload&array{id: string} : mixed) */
+    /** @return ($key is null ? ReportUpdatePayload : mixed) */
     public function validated(mixed $key = null, mixed $default = null): mixed
     {
         return parent::validated($key, $default);

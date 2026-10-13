@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use src\Modules\Report\Application\DTO\CreateReportInputDTO;
+use src\Modules\Report\Application\DTO\ReportCreationScopeDTO;
+use src\Modules\Report\Application\Exception\ReportAccessDeniedException;
 use src\Modules\Report\Application\Interfaces\Mapper\ReportChecklistMapperInterface;
+use src\Modules\Report\Application\Interfaces\Service\ReportAccessServiceInterface;
 use src\Modules\Report\Application\Usecase\CreateReportUsecase;
 use src\Modules\Report\Domain\Entity\ReportEntity;
 use src\Modules\Report\Domain\Enum\ChecklistAnswerEnum;
@@ -22,6 +25,20 @@ use src\Modules\Report\Domain\ValueObject\ReportPreImplementationValueObject;
 afterEach(function (): void {
     Mockery::close();
 });
+
+function reportCreationAccess(CreateReportInputDTO $input, bool $called = true): ReportAccessServiceInterface
+{
+    $access = Mockery::mock(ReportAccessServiceInterface::class);
+
+    if ($called) {
+        $access->shouldReceive('creationScope')->once()->with($input->createdBy, $input->reportTypeId, $input->coordinationId)
+            ->andReturn(new ReportCreationScopeDTO($input->coordinationId, $input->reportTypeId));
+    } else {
+        $access->shouldNotReceive('creationScope');
+    }
+
+    return $access;
+}
 
 test('creates an initial draft with unanswered checklist and absent sections', function (): void {
     $input = new CreateReportInputDTO(createdBy: '550e8400-e29b-41d4-a716-446655440000');
@@ -45,7 +62,7 @@ test('creates an initial draft with unanswered checklist and absent sections', f
             && $report->conclusion() === null
             && $report->attachments()?->checklist() === $checklist,
     ))->andReturnUsing(fn (ReportEntity $report): ReportEntity => $report);
-    $usecase = new CreateReportUsecase($repository, $mapper);
+    $usecase = new CreateReportUsecase($repository, $mapper, reportCreationAccess($input));
 
     $output = $usecase($input);
 
@@ -87,7 +104,7 @@ test('preserves supplied sections and composes the partially answered checklist 
             && $report->conclusion() === $input->conclusion
             && $report->attachments()?->checklist() === $checklist,
     ))->andReturnUsing(fn (ReportEntity $report): ReportEntity => $report);
-    $usecase = new CreateReportUsecase($repository, $mapper);
+    $usecase = new CreateReportUsecase($repository, $mapper, reportCreationAccess($input));
 
     $output = $usecase($input);
 
@@ -106,7 +123,7 @@ test('returns metadata from the report returned by the repository', function ():
     $mapper->shouldReceive('map')->once()->with($input)->andReturn(new ReportChecklistValueObject);
     $repository = Mockery::mock(ReportRepositoryInterface::class);
     $repository->shouldReceive('insert')->once()->with(Mockery::type(ReportEntity::class))->andReturn($savedReport);
-    $usecase = new CreateReportUsecase($repository, $mapper);
+    $usecase = new CreateReportUsecase($repository, $mapper, reportCreationAccess($input));
 
     $output = $usecase($input);
 
@@ -125,7 +142,7 @@ test('propagates a mapper failure without persisting a report', function (): voi
     $mapper->shouldReceive('map')->once()->with($input)->andThrow($exception);
     $repository = Mockery::mock(ReportRepositoryInterface::class);
     $repository->shouldNotReceive('insert');
-    $usecase = new CreateReportUsecase($repository, $mapper);
+    $usecase = new CreateReportUsecase($repository, $mapper, reportCreationAccess($input, false));
 
     expect(fn () => $usecase($input))->toThrow($exception);
 });
@@ -137,7 +154,7 @@ test('propagates a repository failure', function (): void {
     $mapper->shouldReceive('map')->once()->with($input)->andReturn(new ReportChecklistValueObject);
     $repository = Mockery::mock(ReportRepositoryInterface::class);
     $repository->shouldReceive('insert')->once()->with(Mockery::type(ReportEntity::class))->andThrow($exception);
-    $usecase = new CreateReportUsecase($repository, $mapper);
+    $usecase = new CreateReportUsecase($repository, $mapper, reportCreationAccess($input));
 
     expect(fn () => $usecase($input))->toThrow($exception);
 });
@@ -148,7 +165,20 @@ test('rejects an invalid author identifier without persisting a report', functio
     $mapper->shouldReceive('map')->once()->with($input)->andReturn(new ReportChecklistValueObject);
     $repository = Mockery::mock(ReportRepositoryInterface::class);
     $repository->shouldNotReceive('insert');
-    $usecase = new CreateReportUsecase($repository, $mapper);
+    $usecase = new CreateReportUsecase($repository, $mapper, reportCreationAccess($input));
 
     expect(fn () => $usecase($input))->toThrow(InvalidReportIdException::class);
+});
+
+test('does not persist a report when creation authorization is refused', function (): void {
+    $input = new CreateReportInputDTO(createdBy: '550e8400-e29b-41d4-a716-446655440000', coordinationId: 20);
+    $mapper = Mockery::mock(ReportChecklistMapperInterface::class);
+    $mapper->shouldReceive('map')->once()->with($input)->andReturn(new ReportChecklistValueObject);
+    $access = Mockery::mock(ReportAccessServiceInterface::class);
+    $access->shouldReceive('creationScope')->once()->with($input->createdBy, null, 20)->andThrow(new ReportAccessDeniedException);
+    $repository = Mockery::mock(ReportRepositoryInterface::class);
+    $repository->shouldNotReceive('insert');
+    $usecase = new CreateReportUsecase($repository, $mapper, $access);
+
+    expect(fn () => $usecase($input))->toThrow(ReportAccessDeniedException::class);
 });

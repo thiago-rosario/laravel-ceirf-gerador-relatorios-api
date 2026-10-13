@@ -29,6 +29,7 @@ use src\Modules\Report\Application\Interfaces\Usecase\FindReportsByUserIdAndCoor
 use src\Modules\Report\Application\Interfaces\Usecase\FindReportsByUserIdUsecaseInterface;
 use src\Modules\Report\Application\Interfaces\Usecase\GenerateReportUsecaseInterface;
 use src\Modules\Report\Application\Interfaces\Usecase\GetDashboardReportsUsecaseInterface;
+use src\Modules\Report\Application\Interfaces\Usecase\ListReportMunicipalitiesUsecaseInterface;
 use src\Modules\Report\Application\Interfaces\Usecase\SearchReportsUsecaseInterface;
 use src\Modules\Report\Application\Interfaces\Usecase\UpdateReportUsecaseInterface;
 use src\Modules\Report\Application\Service\ReportDataMapperService;
@@ -46,6 +47,7 @@ use src\Modules\Report\Application\Usecase\FindReportsByUserIdAndCoordinateIdUse
 use src\Modules\Report\Application\Usecase\FindReportsByUserIdUsecase;
 use src\Modules\Report\Application\Usecase\GenerateReportUsecase;
 use src\Modules\Report\Application\Usecase\GetDashboardReportsUsecase;
+use src\Modules\Report\Application\Usecase\ListReportMunicipalitiesUsecase;
 use src\Modules\Report\Application\Usecase\SearchReportsUsecase;
 use src\Modules\Report\Application\Usecase\UpdateReportUsecase;
 use src\Modules\Report\Domain\Repository\ReportRepositoryInterface;
@@ -72,6 +74,7 @@ class ReportServiceProvider extends ServiceProvider
         $this->app->bind(ReportAccessServiceInterface::class, ReportAccessService::class);
         $this->app->bind(ReportConsultationRepositoryInterface::class, ReportConsultationEloquentRepository::class);
         $this->app->bind(SearchReportsUsecaseInterface::class, SearchReportsUsecase::class);
+        $this->app->bind(ListReportMunicipalitiesUsecaseInterface::class, ListReportMunicipalitiesUsecase::class);
         $this->app->bind(ReportInputAdapterInterface::class, ReportInputAdapter::class);
         $this->app->bind(ReportRepositoryInterface::class, ReportEloquentRepository::class);
 

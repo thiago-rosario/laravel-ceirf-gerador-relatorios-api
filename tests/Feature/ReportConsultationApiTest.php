@@ -120,6 +120,180 @@ dataset('report consultation roles', [
     'operator' => [UserRoleEnum::OPERATOR], 'viewer' => [UserRoleEnum::VIEWER],
 ]);
 
+describe('paginated report consultation', function (): void {
+    test('every authenticated profile finds generated reports across coordinations while excluding drafts and blocked reviews', function (UserRoleEnum $role): void {
+        $municipalities = reportConsultationCatalog();
+        $own = reportConsultationCoordination('COTEC');
+        $other = reportConsultationCoordination('OTHER');
+        $reader = User::factory()->withRole($role)->create(['coordination_id' => $own['coordination_id']]);
+        $author = User::factory()->create(['coordination_id' => $other['coordination_id']]);
+        $public = reportConsultationRecord($author, $municipalities['salvador'], $other['report_type_id']);
+        $approved = reportConsultationRecord($author, $municipalities['conquista'], $other['report_type_id']);
+        $pending = reportConsultationRecord($author, $municipalities['salvador'], $other['report_type_id']);
+        $rejected = reportConsultationRecord($author, $municipalities['salvador'], $other['report_type_id']);
+        reportConsultationRecord($author, $municipalities['salvador'], $other['report_type_id'], generated: false);
+        reportConsultationReview($approved, $reader, 'APPROVED');
+        reportConsultationReview($pending, $reader, 'PENDING');
+        reportConsultationReview($rejected, $reader, 'REJECTED');
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports?page=1&per_page=10');
+
+        $response->assertOk()->assertJsonPath('status', 'success')->assertJsonCount(2, 'data.reports')
+            ->assertJsonPath('data.pagination.total', 2)->assertJsonMissingPath('data.reports.0.generated_document.storage_identifier');
+        expect(array_column($response->json('data.reports'), 'id'))->toEqualCanonicalizing([$public->id()->value(), $approved->id()->value()]);
+    })->with('report consultation roles');
+
+    test('pagination returns the total and the bounded page without returning all records', function (int $page, array $positions, ?int $from, ?int $to): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $reports = [];
+        foreach (range(1, 5) as $day) {
+            $reports[] = reportConsultationRecord($author, $municipalities['salvador'], createdAt: sprintf('2020-01-%02d 08:00:00', $day));
+        }
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports?'.http_build_query(['page' => $page, 'per_page' => 2]));
+
+        $response->assertOk()->assertJsonPath('data.pagination', [
+            'current_page' => $page, 'per_page' => 2, 'total' => 5, 'last_page' => 3, 'from' => $from, 'to' => $to,
+        ]);
+        expect(array_column($response->json('data.reports'), 'id'))->toBe(array_map(fn (int $position): string => $reports[$position]->id()->value(), $positions));
+    })->with([
+        'first page' => [1, [4, 3], 1, 2], 'middle page' => [2, [2, 1], 3, 4],
+        'last page' => [3, [0], 5, 5], 'page beyond results' => [4, [], null, null],
+    ]);
+
+    test('municipality and normalized typology filters combine before pagination', function (array $filters, array $positions): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $reports = [
+            reportConsultationRecord($author, $municipalities['salvador'], typology: 'DEAM 1B'),
+            reportConsultationRecord($author, $municipalities['conquista'], typology: 'DEAM 1B'),
+            reportConsultationRecord($author, $municipalities['salvador'], typology: 'CIPM 1B'),
+        ];
+        if (isset($filters['municipality_id']) && is_string($filters['municipality_id'])) {
+            $filters['municipality_id'] = $municipalities[$filters['municipality_id']]->id();
+        }
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports?'.http_build_query(['page' => 1, 'per_page' => 10, ...$filters]));
+
+        $response->assertOk()->assertJsonPath('data.pagination.total', count($positions));
+        expect(array_column($response->json('data.reports'), 'id'))->toEqualCanonicalizing(array_map(fn (int $position): string => $reports[$position]->id()->value(), $positions));
+    })->with([
+        'municipality' => [['municipality_id' => 'salvador'], [0, 2]],
+        'case and boundary whitespace typology' => [['typology' => '  deam 1b  '], [0, 1]],
+        'combined municipality and typology' => [['municipality_id' => 'conquista', 'typology' => 'dEaM 1B'], [1]],
+        'literal wildcard typology' => [['typology' => '%'], []],
+        'unknown municipality' => [['municipality_id' => 99999], []],
+    ]);
+
+    test('typology comparison trims boundaries and ignores case while preserving stored internal spaces', function (string $storedTypology, string $filter, int $total): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador'], typology: $storedTypology);
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports?'.http_build_query(['page' => 1, 'typology' => $filter]));
+
+        $response->assertOk()->assertJsonPath('data.pagination.total', $total)->assertJsonCount($total, 'data.reports');
+        if ($total === 1) {
+            $response->assertJsonPath('data.reports.0.id', $report->id()->value());
+        }
+    })->with([
+        'single internal space remains searchable' => ['DEAM 1B', '  dEaM 1b  ', 1],
+        'repeated stored spaces remain searchable' => ['DEAM   1B', '  deam   1b  ', 1],
+        'both boundaries are trimmed' => ['  DEAM   1B  ', '  deam   1b  ', 1],
+        'internal spacing is not silently rewritten' => ['DEAM   1B', 'deam 1b', 0],
+    ]);
+
+    test('empty searches return usable pagination metadata', function (): void {
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports?page=1&per_page=10');
+
+        $response->assertOk()->assertJsonPath('data.reports', [])->assertJsonPath('data.pagination', [
+            'current_page' => 1, 'per_page' => 10, 'total' => 0, 'last_page' => 1, 'from' => null, 'to' => null,
+        ]);
+    });
+
+    test('review decisions require a completed approval and an old blocked review cannot be overridden by another row', function (string $reviewStatus, bool $reviewed, bool $secondApproval, int $total): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador']);
+        reportConsultationReview($report, $author, $reviewStatus);
+        if (! $reviewed) {
+            DB::table('report_reviews')->update(['reviewed_at' => null]);
+        }
+        if ($secondApproval) {
+            reportConsultationReview($report, $author, 'APPROVED');
+        }
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports?page=1');
+
+        $response->assertOk()->assertJsonPath('data.pagination.total', $total)->assertJsonCount($total, 'data.reports');
+    })->with([
+        'approved without completion timestamp remains private' => ['APPROVED', false, false, 0],
+        'normalized completed approval is consultable' => [' approved ', true, false, 1],
+        'pending plus approved remains private' => ['PENDING', true, true, 0],
+        'rejected plus approved remains private' => ['REJECTED', true, true, 0],
+    ]);
+
+    test('invalid search inputs return 422 and identify the rejected parameter', function (array $filters, string $field): void {
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports?'.http_build_query(['page' => 1, ...$filters]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors($field);
+    })->with([
+        'page must be positive' => [['page' => 0], 'page'], 'page size must be positive' => [['per_page' => 0], 'per_page'],
+        'page size is bounded' => [['per_page' => 101], 'per_page'],
+        'municipality must be an identifier' => [['municipality_id' => 'Salvador'], 'municipality_id'],
+        'typology must be text' => [['typology' => ['DEAM']], 'typology'],
+    ]);
+
+    test('the legacy list preserves its response shape and cannot expose private reports to viewers', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $public = reportConsultationRecord($author, $municipalities['salvador']);
+        reportConsultationRecord($author, $municipalities['salvador'], generated: false);
+        $pending = reportConsultationRecord($author, $municipalities['conquista']);
+        reportConsultationReview($pending, $author, 'PENDING');
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports');
+
+        $response->assertOk()->assertJsonCount(1, 'data.reports')->assertJsonPath('data.reports.0.id', $public->id()->value())->assertJsonMissingPath('data.pagination');
+    });
+
+    test('municipality choices include only active Bahia catalog records', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $territoryId = DB::table('identity_territories')->value('id');
+        DB::table('municipalities')->insert([
+            ['identity_territory_id' => $territoryId, 'name' => 'Inativo', 'state_code' => 'BA', 'is_active' => false],
+            ['identity_territory_id' => $territoryId, 'name' => 'Aracaju', 'state_code' => 'SE', 'is_active' => true],
+        ]);
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports/municipalities');
+
+        $response->assertOk()->assertJsonPath('data.municipalities', [
+            ['id' => $municipalities['salvador']->id(), 'name' => 'Salvador', 'state_code' => 'BA'],
+            ['id' => $municipalities['conquista']->id(), 'name' => 'Vitória da Conquista', 'state_code' => 'BA'],
+        ]);
+    });
+});
+
 describe('report metadata authorization', function (): void {
     test('public read responses omit removed uploads and every private media storage token', function (string $path, string $dataPath): void {
         $municipalities = reportConsultationCatalog();
@@ -142,6 +316,7 @@ describe('report metadata authorization', function (): void {
         'history' => ['/api/reports/{id}/history', 'data.reports.0'],
         'legacy list' => ['/api/reports', 'data.reports.0'],
         'dashboard' => ['/api/reports/dashboard', 'data.reports.0'],
+        'paginated consultation' => ['/api/reports?page=1', 'data.reports.0'],
     ]);
 
     test('reviewers and operators outside the editorial scope cannot retrieve upload history or storage tokens', function (UserRoleEnum $role): void {
@@ -520,6 +695,7 @@ test('report reads return 401 when authentication is absent', function (string $
 
     $response->assertUnauthorized()->assertJsonPath('message', 'Não autenticado.');
 })->with([
+    'search' => ['/api/reports?page=1&per_page=10'], 'catalog' => ['/api/reports/municipalities'],
     'metadata' => ['/api/reports/550e8400-e29b-41d4-a716-446655440099'],
     'download' => ['/api/reports/550e8400-e29b-41d4-a716-446655440099/pdf'],
 ]);

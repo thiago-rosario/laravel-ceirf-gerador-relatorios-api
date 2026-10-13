@@ -2,12 +2,17 @@
 
 declare(strict_types=1);
 
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use src\Modules\Identity\Domain\Enum\UserRoleEnum;
 use src\Modules\Identity\Model\User;
+use src\Modules\Report\Application\Exception\ReportPdfUnavailableException;
 use src\Modules\Report\Domain\Entity\ReportAttachmentEntity;
 use src\Modules\Report\Domain\Entity\ReportEntity;
 use src\Modules\Report\Domain\Enum\ForceEnum;
@@ -113,6 +118,15 @@ function reportConsultationReview(ReportEntity $report, User $reviewer, string $
         'reviewer_id' => $reviewer->id, 'status' => $status, 'created_at' => '2020-01-01 09:00:00',
         'reviewed_at' => strtoupper(trim($status)) === 'APPROVED' ? '2020-01-01 10:00:00' : null,
     ]);
+}
+
+function reportConsultationStoredPdf(ReportEntity $report): string
+{
+    $contents = Pdf::loadHTML('<html><body>Relatório de teste</body></html>')
+        ->setOption(['isRemoteEnabled' => false, 'isPhpEnabled' => false, 'isJavascriptEnabled' => false])->output();
+    Storage::disk('local')->put($report->generatedDocument()->storageIdentifier(), $contents);
+
+    return $contents;
 }
 
 dataset('report consultation roles', [
@@ -517,6 +531,161 @@ describe('report metadata authorization', function (): void {
     })->with(['metadata' => [''], 'PDF' => ['/pdf']]);
 });
 
+describe('authenticated PDF delivery', function (): void {
+    test('every profile downloads actual PDF bytes with the persisted filename and private headers', function (UserRoleEnum $role): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole($role)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador']);
+        Storage::fake('local');
+        $contents = reportConsultationStoredPdf($report);
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->get('/api/reports/'.$report->id()->value().'/pdf');
+
+        $response->assertOk()->assertDownload('SALVADOR_PM_1B_DEAM_1B.pdf')->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeaderContains('Cache-Control', 'no-store')->assertHeader('X-Content-Type-Options', 'nosniff')->assertStreamedContent($contents);
+        Storage::disk('local')->assertExists($report->generatedDocument()->storageIdentifier());
+    })->with('report consultation roles');
+
+    test('inline disposition previews the same PDF bytes with secure headers', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador']);
+        Storage::fake('local');
+        $contents = reportConsultationStoredPdf($report);
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->get('/api/reports/'.$report->id()->value().'/pdf?disposition=inline');
+
+        $response->assertOk()->assertHeaderContains('Content-Disposition', 'inline;')->assertHeaderContains('Content-Disposition', 'SALVADOR_PM_1B_DEAM_1B.pdf')
+            ->assertHeader('Content-Type', 'application/pdf')->assertHeaderContains('Cache-Control', 'no-store')->assertStreamedContent($contents);
+        Storage::disk('local')->assertExists($report->generatedDocument()->storageIdentifier());
+    });
+
+    test('a permitted draft returns 409 when the PDF has not been generated', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->superuser()->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador'], generated: false);
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports/'.$report->id()->value().'/pdf');
+
+        $response->assertConflict()->assertJsonPath('message', 'O PDF deste relatório ainda não foi gerado.');
+    });
+
+    test('a document absent from private storage returns 404', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador']);
+        Storage::fake('local');
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports/'.$report->id()->value().'/pdf');
+
+        $response->assertNotFound()->assertJsonPath('message', 'O arquivo PDF do relatório não foi encontrado.');
+        Storage::disk('local')->assertMissing($report->generatedDocument()->storageIdentifier());
+    });
+
+    test('invalid or truncated PDFs return 422 instead of streaming broken documents', function (string $contents): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador']);
+        Storage::fake('local');
+        Storage::disk('local')->put($report->generatedDocument()->storageIdentifier(), $contents);
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports/'.$report->id()->value().'/pdf');
+
+        $response->assertUnprocessable()->assertJsonPath('status', 'error');
+        Storage::disk('local')->assertExists($report->generatedDocument()->storageIdentifier());
+    })->with(['non PDF' => ['<html>Arquivo inválido</html>'], 'truncated PDF' => ["%PDF-1.7\n1 0 obj\n<<>>\nendobj"]]);
+
+    test('paths outside the reports own document directory return 404 without delivering private files', function (string $path): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador'], storageIdentifier: $path);
+        Storage::fake('local');
+        Storage::disk('local')->put($path, '%PDF-1.7 private file %%EOF');
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports/'.$report->id()->value().'/pdf');
+
+        $response->assertNotFound()->assertJsonPath('status', 'error');
+        Storage::disk('local')->assertExists($path);
+    })->with([
+        'another reports PDF' => ['reports/550e8400-e29b-41d4-a716-446655440099/documents/550e8400-e29b-41d4-a716-446655440098.pdf'],
+        'arbitrary private file' => ['private/secret.pdf'],
+    ]);
+
+    test('storage failures return 500 and report the exception', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador']);
+        $token = reportConsultationAccessToken($reader);
+        $storageFailure = new RuntimeException('Storage unavailable');
+        Exceptions::fake();
+        Storage::shouldReceive('disk')->with('local')->andThrow($storageFailure);
+
+        $response = $this->withToken($token)->getJson('/api/reports/'.$report->id()->value().'/pdf');
+
+        $response->assertInternalServerError()->assertJsonPath('status', 'error');
+        Exceptions::assertReported(fn (RuntimeException $exception): bool => $exception === $storageFailure);
+    });
+
+    test('a storage adapter that cannot open its existing file returns 500 and reports the failure', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador']);
+        $token = reportConsultationAccessToken($reader);
+        $disk = Mockery::mock(FilesystemAdapter::class);
+        $disk->shouldReceive('exists')->once()->with($report->generatedDocument()->storageIdentifier())->andReturn(true);
+        $disk->shouldReceive('readStream')->once()->with($report->generatedDocument()->storageIdentifier())->andReturn(null);
+        Storage::shouldReceive('disk')->once()->with('local')->andReturn($disk);
+        Exceptions::fake();
+
+        $response = $this->withToken($token)->getJson('/api/reports/'.$report->id()->value().'/pdf');
+
+        $response->assertInternalServerError()->assertJsonPath('message', 'Não foi possível ler o PDF no armazenamento.');
+        Exceptions::assertReported(ReportPdfUnavailableException::class);
+    });
+
+    test('an unsupported PDF disposition returns 422 before delivering file bytes', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador']);
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports/'.$report->id()->value().'/pdf?disposition=executable');
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('disposition');
+    });
+
+    test('viewer preview and download return 403 for a version with pending review', function (string $query): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador']);
+        reportConsultationReview($report, $author, 'PENDING');
+        Storage::fake('local');
+        reportConsultationStoredPdf($report);
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports/'.$report->id()->value().'/pdf'.$query);
+
+        $response->assertForbidden()->assertJsonPath('message', 'Acesso não autorizado.');
+        Storage::disk('local')->assertExists($report->generatedDocument()->storageIdentifier());
+    })->with(['download' => [''], 'preview' => ['?disposition=inline']]);
+});
+
 describe('report write permission regressions', function (): void {
     test('operators and reviewers create drafts in their own coordination with an explicit or inferred type', function (UserRoleEnum $role, bool $explicitType): void {
         $coordination = reportConsultationCoordination('COTEC');
@@ -698,4 +867,5 @@ test('report reads return 401 when authentication is absent', function (string $
     'search' => ['/api/reports?page=1&per_page=10'], 'catalog' => ['/api/reports/municipalities'],
     'metadata' => ['/api/reports/550e8400-e29b-41d4-a716-446655440099'],
     'download' => ['/api/reports/550e8400-e29b-41d4-a716-446655440099/pdf'],
+    'preview' => ['/api/reports/550e8400-e29b-41d4-a716-446655440099/pdf?disposition=inline'],
 ]);

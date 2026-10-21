@@ -11,7 +11,7 @@ use Throwable;
 class ReportImageTooLargeException extends RuntimeException
 {
     public function __construct(
-        string $message = 'Cada imagem do relatório deve possuir no máximo 5 MB.',
+        string $message = 'Cada imagem do relatório deve possuir no máximo 25 MB.',
         int $code = CodeExceptionEnum::REPORT_IMAGE_TOO_LARGE->value,
         ?Throwable $previous = null,
     ) {

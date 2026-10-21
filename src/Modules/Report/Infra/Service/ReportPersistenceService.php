@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace src\Modules\Report\Infra\Service;
 
 use Illuminate\Support\Facades\DB;
+use src\Modules\Attachment\Application\Interfaces\Service\ReportMediaRegistryServiceInterface;
 use src\Modules\Identity\Model\User;
 use src\Modules\Report\Application\Interfaces\Mapper\ReportPersistenceMapperInterface;
 use src\Modules\Report\Application\Interfaces\Service\ReportPersistenceServiceInterface;
@@ -15,7 +16,10 @@ use src\Modules\Report\Domain\Validation\ReportMediaValidation;
 
 class ReportPersistenceService implements ReportPersistenceServiceInterface
 {
-    public function __construct(private readonly ReportPersistenceMapperInterface $mapper) {}
+    public function __construct(
+        private readonly ReportPersistenceMapperInterface $mapper,
+        private readonly ReportMediaRegistryServiceInterface $mediaRegistry,
+    ) {}
 
     public function authorId(ReportEntity $report): int
     {
@@ -84,6 +88,8 @@ class ReportPersistenceService implements ReportPersistenceServiceInterface
 
     public function storeMedia(ReportEntity $report, int $reportId, int $authorId, ?int $parentReportId = null): void
     {
+        $this->mediaRegistry->markLinked($report);
+
         $inheritedImages = $parentReportId === null ? collect() : DB::table('report_images')->where('report_id', $parentReportId)->get()->keyBy('file_hash');
         $inheritedAttachments = $parentReportId === null ? collect() : DB::table('report_attachments')->where('report_id', $parentReportId)->get()->keyBy('file_hash');
         $activeImages = [];

@@ -10,8 +10,8 @@ use src\Modules\Report\Domain\Exception\InvalidReportImageOrderException;
 use src\Modules\Report\Domain\Exception\ReportImageTooLargeException;
 use src\Modules\Report\Domain\ValueObject\ReportFileReferenceValueObject;
 
-test('accepts the approved visual formats at the five megabyte boundary', function (string $mimeType): void {
-    $file = new ReportFileReferenceValueObject('object:figure', 'figure', $mimeType, 5_242_880, str_repeat('a', 64));
+test('accepts the approved visual formats at the twenty-five megabyte boundary', function (string $mimeType): void {
+    $file = new ReportFileReferenceValueObject('object:figure', 'figure', $mimeType, 26_214_400, str_repeat('a', 64));
 
     $image = new ReportImageEntity($file, 1, id: '00000000-0000-4000-8000-000000000001');
 
@@ -22,12 +22,12 @@ test('accepts the approved visual formats at the five megabyte boundary', functi
     'PDF' => ['application/pdf'],
 ]);
 
-test('rejects a visual file larger than five megabytes with code 2012', function (): void {
-    $file = new ReportFileReferenceValueObject('object:figure', 'figure.png', 'image/png', 5_242_881, str_repeat('a', 64));
+test('rejects a visual file larger than twenty-five megabytes with code 2012', function (): void {
+    $file = new ReportFileReferenceValueObject('object:figure', 'figure.png', 'image/png', 26_214_401, str_repeat('a', 64));
 
     expect(fn () => new ReportImageEntity($file, 1))->toThrow(function (ReportImageTooLargeException $exception): void {
         expect($exception->getCode())->toBe(2012);
-        expect($exception->getMessage())->toBe('Cada imagem do relatório deve possuir no máximo 5 MB.');
+        expect($exception->getMessage())->toBe('Cada imagem do relatório deve possuir no máximo 25 MB.');
     });
 });
 

@@ -13,7 +13,7 @@ use src\Modules\Report\Domain\ValueObject\ReportFileReferenceValueObject;
 
 final class ReportImageValidation
 {
-    public const int MAXIMUM_SIZE_BYTES = 5 * 1024 * 1024;
+    public const int MAXIMUM_SIZE_BYTES = 25 * 1024 * 1024;
 
     public const array ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'application/pdf'];
 

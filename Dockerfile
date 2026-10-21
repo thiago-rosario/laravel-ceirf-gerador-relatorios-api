@@ -7,7 +7,8 @@ RUN apt-get update \
 
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
-RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
+RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini" \
+    && printf 'upload_max_filesize = 25M\npost_max_size = 32M\n' > "$PHP_INI_DIR/conf.d/uploads.ini"
 
 WORKDIR /var/www/html
 

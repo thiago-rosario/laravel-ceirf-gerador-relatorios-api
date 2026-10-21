@@ -46,7 +46,7 @@ test('rejects an attachment description exceeding five hundred characters with c
 });
 
 test('prevents attachment uploads from bypassing the visual file size limit', function (): void {
-    $file = new ReportFileReferenceValueObject('object:annex', 'annex.pdf', 'application/pdf', 5_242_881, str_repeat('a', 64));
+    $file = new ReportFileReferenceValueObject('object:annex', 'annex.pdf', 'application/pdf', 26_214_401, str_repeat('a', 64));
 
     expect(fn () => new ReportAttachmentEntity(ReportAttachmentTypeEnum::OTHER, $file))
         ->toThrow(function (ReportImageTooLargeException $exception): void {

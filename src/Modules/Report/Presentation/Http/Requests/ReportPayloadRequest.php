@@ -12,6 +12,7 @@ use src\Modules\Report\Application\Interfaces\Service\ReportAccessServiceInterfa
 use src\Modules\Report\Domain\Enum\ChecklistAnswerEnum;
 use src\Modules\Report\Domain\Enum\ForceEnum;
 use src\Modules\Report\Domain\Enum\ReportSizeEnum;
+use src\Modules\Report\Domain\Validation\ReportImageValidation;
 use Stringable;
 
 /** @phpstan-import-type ReportPayload from \src\Modules\Report\Application\Interfaces\Adapter\ReportInputAdapterInterface */
@@ -100,7 +101,7 @@ abstract class ReportPayloadRequest extends FormRequest
             $path.'.file.storage_identifier' => ['required_with:'.$path, 'string', 'max:255'],
             $path.'.file.file_name' => ['required_with:'.$path, 'string', 'max:255'],
             $path.'.file.mime_type' => ['required_with:'.$path, 'in:image/png,image/jpeg,application/pdf'],
-            $path.'.file.size_bytes' => ['required_with:'.$path, 'integer', 'min:1', 'max:5242880'],
+            $path.'.file.size_bytes' => ['required_with:'.$path, 'integer', 'min:1', 'max:'.ReportImageValidation::MAXIMUM_SIZE_BYTES],
             $path.'.file.checksum' => ['required_with:'.$path, 'string', 'regex:/^[a-fA-F0-9]{64}$/'],
         ];
         if ($isImage) {

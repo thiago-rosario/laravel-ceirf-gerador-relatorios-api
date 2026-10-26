@@ -11,7 +11,9 @@ use src\Modules\Report\Application\Interfaces\Usecase\SearchReportsUsecaseInterf
 
 class SearchReportsUsecase implements SearchReportsUsecaseInterface
 {
-    public function __construct(private readonly ReportConsultationRepositoryInterface $repository) {}
+    public function __construct(
+        private readonly ReportConsultationRepositoryInterface $repository
+    ){}
 
     public function __invoke(SearchReportsInputDTO $input): SearchReportsOutputDTO
     {

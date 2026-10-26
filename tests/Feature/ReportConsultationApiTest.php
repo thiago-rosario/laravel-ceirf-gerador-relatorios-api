@@ -308,6 +308,126 @@ describe('paginated report consultation', function (): void {
     });
 });
 
+describe('dashboard report authors', function (): void {
+    test('non administrative readers receive the current public author identity only for accessible reports', function (UserRoleEnum $role): void {
+        $municipalities = reportConsultationCatalog();
+        $own = reportConsultationCoordination('COTEC');
+        $other = reportConsultationCoordination('OTHER');
+        $reader = User::factory()->withRole($role)->create(['coordination_id' => $own['coordination_id']]);
+        $author = User::factory()->create(['name' => 'Nome anterior', 'coordination_id' => $other['coordination_id']]);
+        $public = reportConsultationRecord($author, $municipalities['salvador'], $other['report_type_id']);
+        reportConsultationRecord($author, $municipalities['salvador'], $other['report_type_id'], generated: false);
+        $pending = reportConsultationRecord($author, $municipalities['conquista'], $other['report_type_id']);
+        reportConsultationReview($pending, $author, 'PENDING');
+        $author->update(['name' => 'Mariana Santos']);
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports/dashboard');
+
+        $response->assertOk()->assertJsonPath('status', 'success')->assertJsonPath('data.total_reports', 1)
+            ->assertJsonCount(1, 'data.reports')->assertJsonPath('data.reports.0.id', $public->id()->value())
+            ->assertJsonPath('data.reports.0.created_by', $author->uuid)
+            ->assertJsonPath('data.reports.0.author', ['id' => $author->uuid, 'name' => 'Mariana Santos'])
+            ->assertJsonPath('data.reports.0.cover.typology', 'DEAM 1B')
+            ->assertJsonPath('data.reports.0.status', 'GENERATED')
+            ->assertJsonStructure(['status', 'data' => ['total_reports', 'reports' => [[
+                'id', 'root_report_id', 'parent_report_id', 'created_by', 'revision_number', 'status', 'revision_label',
+                'is_generated', 'is_revision', 'created_at', 'updated_at', 'cover', 'general_information',
+                'location', 'infrastructure', 'pre_implementation', 'photographic_documentation', 'attachments',
+                'conclusion', 'generated_document', 'coordination_id', 'report_type_id', 'author',
+            ]]]]);
+    })->with([
+        'viewer' => [UserRoleEnum::VIEWER], 'operator' => [UserRoleEnum::OPERATOR], 'reviewer' => [UserRoleEnum::REVIEWER],
+    ]);
+
+    test('dashboard authors follow the persisted creator when the content snapshot contains another user UUID', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $snapshotAuthor = User::factory()->create(['name' => 'Autor do snapshot']);
+        $persistedAuthor = User::factory()->create(['name' => 'Autor persistido']);
+        $report = reportConsultationRecord($snapshotAuthor, $municipalities['salvador']);
+        Report::query()->where('uuid', $report->id()->value())->update(['created_by' => $persistedAuthor->id]);
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports/dashboard');
+
+        $response->assertOk()->assertJsonPath('data.reports.0.id', $report->id()->value())
+            ->assertJsonPath('data.reports.0.created_by', $snapshotAuthor->uuid)
+            ->assertJsonPath('data.reports.0.author', ['id' => $persistedAuthor->uuid, 'name' => 'Autor persistido']);
+    });
+
+    test('dashboard keeps a legacy snapshot report when its persisted author cannot be identified', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        $report = reportConsultationRecord($author, $municipalities['salvador']);
+        $token = reportConsultationAccessToken($reader);
+        DB::statement('PRAGMA defer_foreign_keys = ON');
+
+        try {
+            Report::query()->where('uuid', $report->id()->value())->update(['created_by' => 999999]);
+            $response = $this->withToken($token)->getJson('/api/reports/dashboard');
+        } finally {
+            Report::query()->where('uuid', $report->id()->value())->update(['created_by' => $author->id]);
+            DB::statement('PRAGMA defer_foreign_keys = OFF');
+        }
+
+        $response->assertOk()->assertJsonPath('status', 'success')->assertJsonPath('data.total_reports', 1)
+            ->assertJsonPath('data.reports.0.id', $report->id()->value())
+            ->assertJsonPath('data.reports.0.created_by', $author->uuid)->assertJsonPath('data.reports.0.author', null);
+    });
+
+    test('empty dashboards preserve their JSend envelope', function (): void {
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $token = reportConsultationAccessToken($reader);
+
+        $response = $this->withToken($token)->getJson('/api/reports/dashboard');
+
+        $response->assertOk()->assertExactJson(['status' => 'success', 'data' => ['total_reports' => 0, 'reports' => []]]);
+    });
+
+    test('dashboard author lookup query count stays constant as reports from distinct authors are added', function (): void {
+        $municipalities = reportConsultationCatalog();
+        $reader = User::factory()->withRole(UserRoleEnum::VIEWER)->create();
+        $author = User::factory()->create();
+        reportConsultationRecord($author, $municipalities['salvador']);
+        $token = reportConsultationAccessToken($reader);
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        try {
+            $singleResponse = $this->withToken($token)->getJson('/api/reports/dashboard');
+            $singleQueryCount = count(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+
+        $singleResponse->assertOk()->assertJsonCount(1, 'data.reports')
+            ->assertJsonPath('data.reports.0.author', ['id' => $author->uuid, 'name' => $author->name]);
+        $expectedAuthorIds = [$author->uuid];
+        foreach (range(1, 4) as $day) {
+            $additionalAuthor = User::factory()->create();
+            $expectedAuthorIds[] = $additionalAuthor->uuid;
+            reportConsultationRecord($additionalAuthor, $municipalities['salvador'], createdAt: sprintf('2020-01-%02d 09:00:00', $day));
+        }
+        Auth::forgetGuards();
+        DB::enableQueryLog();
+
+        try {
+            $multipleResponse = $this->withToken($token)->getJson('/api/reports/dashboard');
+            $multipleQueryCount = count(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+
+        $multipleResponse->assertOk()->assertJsonCount(5, 'data.reports');
+        expect(array_column(array_column($multipleResponse->json('data.reports'), 'author'), 'id'))->toEqualCanonicalizing($expectedAuthorIds);
+        expect($multipleQueryCount)->toBe($singleQueryCount);
+    });
+});
+
 describe('report metadata authorization', function (): void {
     test('public read responses omit removed uploads and every private media storage token', function (string $path, string $dataPath): void {
         $municipalities = reportConsultationCatalog();
@@ -865,6 +985,7 @@ test('report reads return 401 when authentication is absent', function (string $
     $response->assertUnauthorized()->assertJsonPath('message', 'Não autenticado.');
 })->with([
     'search' => ['/api/reports?page=1&per_page=10'], 'catalog' => ['/api/reports/municipalities'],
+    'dashboard' => ['/api/reports/dashboard'],
     'metadata' => ['/api/reports/550e8400-e29b-41d4-a716-446655440099'],
     'download' => ['/api/reports/550e8400-e29b-41d4-a716-446655440099/pdf'],
     'preview' => ['/api/reports/550e8400-e29b-41d4-a716-446655440099/pdf?disposition=inline'],

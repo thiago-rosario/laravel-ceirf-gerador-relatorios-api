@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace src\Modules\Report\Infra\Repositories\Queries;
 
 use DateTimeImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use src\Modules\Identity\Model\User;
 use src\Modules\Report\Application\DTO\MunicipalityDataDTO;
@@ -79,7 +80,32 @@ class ReportConsultationEloquentRepository implements ReportConsultationReposito
 
         $reports = $models->map(fn (Report $model) => $this->mapper->map(ReportEntity::fromModel($model, $this->persistenceMapper, $this->legacyMapper)))->all();
 
-        return new SearchReportsOutputDTO(array_values($reports), $total, $pagination);
+        return new SearchReportsOutputDTO(
+            array_values($reports),
+            $total,
+            $pagination,
+            $input->includeAuthors ? $this->authorsByReportId($models) : [],
+        );
+    }
+
+    /**
+     * @param  Collection<int, Report>  $reports
+     * @return array<string, array{id: string, name: string}|null>
+     */
+    private function authorsByReportId(Collection $reports): array
+    {
+        if ($reports->isEmpty()) {
+            return [];
+        }
+
+        $authors = User::query()->whereKey($reports->pluck('created_by')->unique())
+            ->get(['id', 'uuid', 'name'])->keyBy('id');
+
+        return $reports->mapWithKeys(function (Report $report) use ($authors): array {
+            $author = $authors->get($report->created_by);
+
+            return [$report->uuid => $author === null ? null : ['id' => $author->uuid, 'name' => $author->name]];
+        })->all();
     }
 
     public function municipalities(): array

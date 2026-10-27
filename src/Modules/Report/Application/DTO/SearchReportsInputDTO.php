@@ -16,6 +16,8 @@ readonly class SearchReportsInputDTO
         public ?int $coordinationId = null,
         public ?string $rootReportId = null,
         public ?string $month = null,
+        public ?string $createdBy = null,
         public bool $countOnly = false,
+        public bool $includeAuthors = false,
     ) {}
 }

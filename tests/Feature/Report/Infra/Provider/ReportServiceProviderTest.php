@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+use src\Modules\Report\Application\Catalog\Interfaces\Repository\ReportCatalogRepositoryInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportAnswersUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportChecklistUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportForcesUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportInfrastructureUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportTypologiesUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Usecase\ListReportAnswersUsecase;
+use src\Modules\Report\Application\Catalog\Usecase\ListReportChecklistUsecase;
+use src\Modules\Report\Application\Catalog\Usecase\ListReportForcesUsecase;
+use src\Modules\Report\Application\Catalog\Usecase\ListReportInfrastructureUsecase;
+use src\Modules\Report\Application\Catalog\Usecase\ListReportTypologiesUsecase;
 use src\Modules\Report\Application\Interfaces\Adapter\ReportGeneratorAdapterInterface;
 use src\Modules\Report\Application\Interfaces\Adapter\ReportQueryResultAdapterInterface;
 use src\Modules\Report\Application\Interfaces\Mapper\LegacyReportQueryMapperInterface;
@@ -43,6 +54,7 @@ use src\Modules\Report\Application\Usecase\UpdateReportUsecase;
 use src\Modules\Report\Domain\Repository\ReportRepositoryInterface;
 use src\Modules\Report\Infra\Adapter\ReportGeneratorAdapter;
 use src\Modules\Report\Infra\Adapter\ReportQueryResultAdapter;
+use src\Modules\Report\Infra\Catalog\Repository\ReportCatalogRepository;
 use src\Modules\Report\Infra\Mapper\LegacyReportQueryMapper;
 use src\Modules\Report\Infra\Mapper\ReportChecklistMapper;
 use src\Modules\Report\Infra\Mapper\ReportPersistenceMapper;
@@ -54,6 +66,12 @@ test('resolves report contracts with their complete dependency graphs', function
 
     expect($resolved)->toBeInstanceOf($implementation);
 })->with([
+    'catalog repository' => [ReportCatalogRepositoryInterface::class, ReportCatalogRepository::class],
+    'force catalog' => [ListReportForcesUsecaseInterface::class, ListReportForcesUsecase::class],
+    'typology catalog' => [ListReportTypologiesUsecaseInterface::class, ListReportTypologiesUsecase::class],
+    'answer catalog' => [ListReportAnswersUsecaseInterface::class, ListReportAnswersUsecase::class],
+    'infrastructure catalog' => [ListReportInfrastructureUsecaseInterface::class, ListReportInfrastructureUsecase::class],
+    'checklist catalog' => [ListReportChecklistUsecaseInterface::class, ListReportChecklistUsecase::class],
     'repository' => [ReportRepositoryInterface::class, ReportEloquentRepository::class],
     'data mapper service' => [ReportDataMapperServiceInterface::class, ReportDataMapperService::class],
     'finder service' => [ReportFinderServiceInterface::class, ReportFinderService::class],

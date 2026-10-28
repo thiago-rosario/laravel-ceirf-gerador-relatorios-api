@@ -5,6 +5,17 @@ declare(strict_types=1);
 namespace src\Modules\Report\Infra\Provider;
 
 use Illuminate\Support\ServiceProvider;
+use src\Modules\Report\Application\Catalog\Interfaces\Repository\ReportCatalogRepositoryInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportAnswersUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportChecklistUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportForcesUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportInfrastructureUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportTypologiesUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Usecase\ListReportAnswersUsecase;
+use src\Modules\Report\Application\Catalog\Usecase\ListReportChecklistUsecase;
+use src\Modules\Report\Application\Catalog\Usecase\ListReportForcesUsecase;
+use src\Modules\Report\Application\Catalog\Usecase\ListReportInfrastructureUsecase;
+use src\Modules\Report\Application\Catalog\Usecase\ListReportTypologiesUsecase;
 use src\Modules\Report\Application\Interfaces\Adapter\ReportGeneratorAdapterInterface;
 use src\Modules\Report\Application\Interfaces\Adapter\ReportInputAdapterInterface;
 use src\Modules\Report\Application\Interfaces\Adapter\ReportQueryResultAdapterInterface;
@@ -57,6 +68,7 @@ use src\Modules\Report\Domain\Repository\ReportRepositoryInterface;
 use src\Modules\Report\Infra\Adapter\ReportGeneratorAdapter;
 use src\Modules\Report\Infra\Adapter\ReportInputAdapter;
 use src\Modules\Report\Infra\Adapter\ReportQueryResultAdapter;
+use src\Modules\Report\Infra\Catalog\Repository\ReportCatalogRepository;
 use src\Modules\Report\Infra\Mapper\LegacyReportQueryMapper;
 use src\Modules\Report\Infra\Mapper\ReportChecklistMapper;
 use src\Modules\Report\Infra\Mapper\ReportPersistenceMapper;
@@ -75,6 +87,13 @@ class ReportServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->bind(ReportCatalogRepositoryInterface::class, ReportCatalogRepository::class);
+        $this->app->bind(ListReportForcesUsecaseInterface::class, ListReportForcesUsecase::class);
+        $this->app->bind(ListReportTypologiesUsecaseInterface::class, ListReportTypologiesUsecase::class);
+        $this->app->bind(ListReportAnswersUsecaseInterface::class, ListReportAnswersUsecase::class);
+        $this->app->bind(ListReportInfrastructureUsecaseInterface::class, ListReportInfrastructureUsecase::class);
+        $this->app->bind(ListReportChecklistUsecaseInterface::class, ListReportChecklistUsecase::class);
+
         $this->app->bind(ReportPdfStorageInterface::class, ReportPdfStorage::class);
         $this->app->bind(GetReportPdfUsecaseInterface::class, GetReportPdfUsecase::class);
         $this->app->bind(ReportAccessServiceInterface::class, ReportAccessService::class);

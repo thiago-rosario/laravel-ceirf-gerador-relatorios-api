@@ -21,6 +21,8 @@ use src\Modules\Report\Domain\ValueObject\GeneratedReportValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportAttachmentsValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportConclusionValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportCoverValueObject;
+use src\Modules\Report\Domain\ValueObject\ReportGeneralInformationValueObject;
+use src\Modules\Report\Domain\ValueObject\ReportInstitutionalRepresentativeValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPhotographicDocumentationValueObject;
 use src\Modules\Report\Model\Report;
 use Tests\Fixtures\ReportApplicationFixtures;
@@ -166,6 +168,48 @@ test('creates revisions in one family and rejects a competing revision without c
     $this->assertDatabaseCount('report_series', 1);
     $this->assertDatabaseCount('reports', 2);
     $this->assertDatabaseCount('report_images', 2);
+});
+
+test('inherits institutional representatives into a revision and preserves the generated version when they are edited', function (): void {
+    createReportRepositoryCatalog();
+    $user = User::factory()->create();
+    $repository = app(ReportRepositoryInterface::class);
+    $root = $repository->insert(ReportApplicationFixtures::completeReport([
+        'createdBy' => $user->uuid,
+        'generalInformation' => new ReportGeneralInformationValueObject(
+            inspectionDate: new DateTimeImmutable('2020-01-01'),
+            collaborators: 'Equipe técnica',
+            institutionalRepresentatives: [
+                new ReportInstitutionalRepresentativeValueObject('Ana Souza', 'Secretária'),
+                new ReportInstitutionalRepresentativeValueObject('José Santos', 'Diretor'),
+            ],
+        ),
+        'generatedDocument' => ReportApplicationFixtures::document('SALVADOR_PM_1B_DELEGACIA.pdf'),
+    ]));
+    $originalPayload = Report::query()->where('uuid', $root->id()->value())->value('payload');
+    $revision = $repository->insert($root->createRevision());
+    expect($revision->generalInformation()?->institutionalRepresentatives())->toEqual($root->generalInformation()?->institutionalRepresentatives());
+    $revision->changeGeneralInformation(new ReportGeneralInformationValueObject(
+        inspectionDate: $revision->generalInformation()?->inspectionDate(),
+        collaborators: 'Equipe técnica',
+        institutionalRepresentatives: [new ReportInstitutionalRepresentativeValueObject('José Santos', 'Superintendente')],
+    ));
+
+    $repository->update($revision);
+    $restoredRevision = $repository->findById($revision->id()->value());
+    $restoredRoot = $repository->findById($root->id()->value());
+
+    expect($restoredRevision?->generalInformation()?->institutionalRepresentatives())->toHaveCount(1);
+    expect($restoredRevision?->generalInformation()?->institutionalRepresentatives()[0]->name())->toBe('José Santos');
+    expect($restoredRevision?->generalInformation()?->institutionalRepresentatives()[0]->position())->toBe('Superintendente');
+    expect($restoredRevision?->generalInformation()?->collaborators())->toBe('Equipe técnica');
+    expect($restoredRoot?->generalInformation()?->institutionalRepresentatives())->toHaveCount(2);
+    expect($restoredRoot?->generalInformation()?->institutionalRepresentatives()[0]->name())->toBe('Ana Souza');
+    expect($restoredRoot?->generalInformation()?->institutionalRepresentatives()[1]->position())->toBe('Diretor');
+    expect(Report::query()->where('uuid', $root->id()->value())->value('payload'))->toBe($originalPayload);
+    $this->assertDatabaseHas('reports', ['uuid' => $root->id()->value(), 'status' => 'GENERATED']);
+    $this->assertDatabaseHas('reports', ['uuid' => $revision->id()->value(), 'status' => 'DRAFT']);
+    $this->assertDatabaseCount('reports', 2);
 });
 
 test('rejects revision persistence when its parent is still a draft', function (): void {

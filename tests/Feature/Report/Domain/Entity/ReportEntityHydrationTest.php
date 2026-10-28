@@ -98,6 +98,7 @@ test('restores legacy scalar drafts and their revision family without blocking d
     expect($history[0]->cover()?->seiNumber()?->value())->toBe('SEI 100/2020');
     expect($history[0]->generalInformation()?->inspectionDate()?->format('Y-m-d'))->toBe('2020-01-01');
     expect($history[0]->generalInformation()?->collaborators())->toBe('Equipe de vistoria');
+    expect($history[0]->generalInformation()?->institutionalRepresentatives())->toBe([]);
     expect($history[0]->infrastructure()?->waterNetwork())->toBe(ChecklistAnswerEnum::YES);
     expect($history[0]->infrastructure()?->highVoltageNetwork())->toBe(ChecklistAnswerEnum::NO);
     expect($history[0]->infrastructure()?->telephony())->toBe(ChecklistAnswerEnum::NOT_APPLICABLE);

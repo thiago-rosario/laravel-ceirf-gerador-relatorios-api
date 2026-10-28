@@ -12,6 +12,7 @@ use src\Modules\Report\Domain\ValueObject\ReportAttachmentsValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportConclusionValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportCoverValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportGeneralInformationValueObject;
+use src\Modules\Report\Domain\ValueObject\ReportInstitutionalRepresentativeValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportLocationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPhotographicDocumentationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPreImplementationValueObject;
@@ -143,6 +144,9 @@ test('escapes every editable text field and preserves the conclusion line breaks
         'generalInformation' => new ReportGeneralInformationValueObject(
             inspectionDate: new DateTimeImmutable('2020-01-01'),
             collaborators: '<script>collaborators()</script>',
+            institutionalRepresentatives: [
+                new ReportInstitutionalRepresentativeValueObject('<script>representative()</script>', '<script>position()</script>'),
+            ],
         ),
         'photographicDocumentation' => new ReportPhotographicDocumentationValueObject([$photograph]),
         'attachments' => new ReportAttachmentsValueObject(others: [$attachment]),
@@ -157,8 +161,41 @@ test('escapes every editable text field and preserves the conclusion line breaks
         ->toContain('&lt;script&gt;typology()&lt;/script&gt;')
         ->toContain('&lt;script&gt;sei()&lt;/script&gt;')
         ->toContain('&lt;script&gt;collaborators()&lt;/script&gt;')
+        ->toContain('&lt;script&gt;representative()&lt;/script&gt;')
+        ->toContain('&lt;script&gt;position()&lt;/script&gt;')
         ->toContain('&lt;script&gt;caption()&lt;/script&gt;')
         ->toContain('&lt;script&gt;attachment()&lt;/script&gt;')
         ->toContain('&lt;script&gt;conclusion()&lt;/script&gt;');
     expect(preg_replace('/<br\s*\/?\s*>/i', '', $html))->toContain("&lt;script&gt;conclusion()&lt;/script&gt;\nSegunda linha da conclusão.");
+});
+
+test('renders institutional representatives and positions independently from present collaborators', function (): void {
+    $report = ReportApplicationFixtures::completeReport([
+        'generalInformation' => new ReportGeneralInformationValueObject(
+            inspectionDate: new DateTimeImmutable('2020-01-01'),
+            collaborators: 'Ana Silva e João Santos',
+            institutionalRepresentatives: [
+                new ReportInstitutionalRepresentativeValueObject('Maria Oliveira', 'Secretária municipal'),
+                new ReportInstitutionalRepresentativeValueObject('José Souza', 'Diretor de infraestrutura'),
+            ],
+        ),
+    ]);
+    $resource = new ReportPdfResource(app(ReportDataMapperService::class)->map($report));
+
+    $html = $resource->render();
+
+    expect($html)->toContain('<strong>Colaboradores presentes:</strong> Ana Silva e João Santos')
+        ->toContain('<strong>Representantes institucionais:</strong>')
+        ->toContain('Maria Oliveira — Secretária municipal')
+        ->toContain('José Souza — Diretor de infraestrutura');
+});
+
+test('omits the institutional representatives block when the report has none', function (): void {
+    $report = ReportApplicationFixtures::completeReport();
+    $resource = new ReportPdfResource(app(ReportDataMapperService::class)->map($report));
+
+    $html = $resource->render();
+
+    expect($html)->not->toContain('Representantes institucionais:')
+        ->toContain('<strong>Colaboradores presentes:</strong> Ana Silva e João Santos');
 });

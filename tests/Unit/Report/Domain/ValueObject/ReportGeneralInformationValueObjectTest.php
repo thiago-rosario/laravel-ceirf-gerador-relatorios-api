@@ -4,16 +4,41 @@ declare(strict_types=1);
 
 use src\Modules\Report\Domain\Exception\FutureInspectionDateException;
 use src\Modules\Report\Domain\Exception\IncompleteReportException;
+use src\Modules\Report\Domain\Exception\InvalidInstitutionalRepresentativeException;
 use src\Modules\Report\Domain\Exception\InvalidReportCollaboratorsException;
 use src\Modules\Report\Domain\Validation\ReportGeneralInformationValidation;
 use src\Modules\Report\Domain\ValueObject\ReportGeneralInformationValueObject;
+use src\Modules\Report\Domain\ValueObject\ReportInstitutionalRepresentativeValueObject;
 
 test('allows pending inspection information while the report is a draft', function (): void {
     $information = new ReportGeneralInformationValueObject;
 
     expect($information->inspectionDate())->toBeNull();
     expect($information->collaborators())->toBe('');
+    expect($information->institutionalRepresentatives())->toBe([]);
 });
+
+test('keeps institutional representatives independent from the collaborators required for generation', function (): void {
+    $representative = new ReportInstitutionalRepresentativeValueObject('Ana Souza', 'Secretária');
+    $information = new ReportGeneralInformationValueObject(
+        inspectionDate: new DateTimeImmutable('2000-01-01'),
+        institutionalRepresentatives: [$representative],
+    );
+
+    expect(fn () => ReportGeneralInformationValidation::validateForGeneration($information))
+        ->toThrow(IncompleteReportException::class);
+
+    expect($information->institutionalRepresentatives())->toBe([$representative]);
+    expect($information->collaborators())->toBe('');
+});
+
+test('rejects institutional representative collections that cannot form a valid report snapshot', function (Closure $representatives): void {
+    expect(fn () => new ReportGeneralInformationValueObject(institutionalRepresentatives: $representatives()))
+        ->toThrow(InvalidInstitutionalRepresentativeException::class);
+})->with([
+    'non-list collection' => [fn (): array => [1 => new ReportInstitutionalRepresentativeValueObject('Ana Souza', 'Secretária')]],
+    'unvalidated representative data' => [fn (): array => [['name' => 'Ana Souza', 'position' => 'Secretária']]],
+]);
 
 test('accepts an immutable inspection date and collaborators for generation', function (): void {
     $inspectionDate = new DateTimeImmutable('2000-01-01 10:00:00');

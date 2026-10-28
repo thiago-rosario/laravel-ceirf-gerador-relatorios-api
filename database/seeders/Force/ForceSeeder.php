@@ -4,18 +4,20 @@ namespace Database\Seeders\Force;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use src\Modules\Report\Domain\Enum\ForceEnum;
 
 class ForceSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('forces')->insertOrIgnore([
-            ['code' => 'PM', 'name' => 'Policia Militar', 'is_active' => true],
-            ['code' => 'PC', 'name' => 'Policia Civil', 'is_active' => true],
-            ['code' => 'BM', 'name' => 'Bombeiro militar', 'is_active' => true],
-            ['code' => 'DPT', 'name' => 'Departamento de policia tecnica', 'is_active' => true],
-            ['code' => 'PC-PM', 'name' => 'Conjugada', 'is_active' => true],
-            ['code' => 'SSP', 'name' => 'Secretaria da Segurança Pública', 'is_active' => true],
-        ]);
+        $codes = DB::table('forces')->pluck('code')->all();
+
+        foreach (ForceEnum::cases() as $force) {
+            if (! in_array($force->databaseCode(), $codes, true) && ! in_array($force->value, $codes, true)) {
+                DB::table('forces')->insertOrIgnore([
+                    'code' => $force->databaseCode(), 'name' => $force->name(), 'is_active' => true,
+                ]);
+            }
+        }
     }
 }

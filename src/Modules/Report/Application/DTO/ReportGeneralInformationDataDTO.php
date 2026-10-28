@@ -8,8 +8,10 @@ use DateTimeImmutable;
 
 readonly class ReportGeneralInformationDataDTO
 {
+    /** @param list<ReportInstitutionalRepresentativeDataDTO> $institutionalRepresentatives */
     public function __construct(
         public ?DateTimeImmutable $inspectionDate,
         public string $collaborators,
+        public array $institutionalRepresentatives = [],
     ) {}
 }

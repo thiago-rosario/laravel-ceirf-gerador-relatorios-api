@@ -17,18 +17,25 @@ use Throwable;
 
 class GetDashboardReportsController extends Controller
 {
-    public function __construct(private readonly SearchReportsUsecaseInterface $usecase, private readonly ReportAccessServiceInterface $access) {}
+    public function __construct(
+        private readonly SearchReportsUsecaseInterface $usecase,
+        private readonly ReportAccessServiceInterface $access
+    ) {}
 
     public function __invoke(Request $request): JsonResponse
     {
         try {
             /** @var User $user */
             $user = $request->user();
-            $result = $this->usecase->__invoke(new SearchReportsInputDTO(actorId: $user->uuid));
+            $result = $this->usecase->__invoke(new SearchReportsInputDTO(actorId: $user->uuid, includeAuthors: true));
+            $reports = ReportResource::collectionForReader($result->reports, $user->uuid, $this->access, $request);
 
             return (new ResponseJsend([
                 'total_reports' => $result->total,
-                'reports' => ReportResource::collectionForReader($result->reports, $user->uuid, $this->access, $request),
+                'reports' => array_map(fn (array $report): array => [
+                    ...$report,
+                    'author' => $result->authorsByReportId[$report['id']] ?? null,
+                ], $reports),
             ]))->toJsonResponse();
         } catch (Throwable $e) {
             report($e);

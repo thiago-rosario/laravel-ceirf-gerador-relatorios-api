@@ -28,6 +28,7 @@ use src\Modules\Report\Domain\ValueObject\ReportCoverValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportFileReferenceValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportGeneralInformationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportInfrastructureValueObject;
+use src\Modules\Report\Domain\ValueObject\ReportInstitutionalRepresentativeValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportLocationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPhotographicDocumentationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPreImplementationValueObject;
@@ -37,6 +38,7 @@ use src\Modules\Report\Domain\ValueObject\SeiNumberValueObject;
  * @phpstan-import-type ReportPayload from ReportInputAdapterInterface
  * @phpstan-import-type ReportUpdatePayload from ReportInputAdapterInterface
  * @phpstan-import-type CoverInput from ReportInputAdapterInterface
+ * @phpstan-import-type GeneralInformationInput from ReportInputAdapterInterface
  * @phpstan-import-type FileInput from ReportInputAdapterInterface
  * @phpstan-import-type ImageInput from ReportInputAdapterInterface
  * @phpstan-import-type AttachmentInput from ReportInputAdapterInterface
@@ -90,7 +92,7 @@ class ReportInputAdapter implements ReportInputAdapterInterface
     {
         $report = $this->finder->findById($data['id']);
         $rootReportId = $report->rootReportId()->value();
-        $sections = $this->sections($data, $rootReportId);
+        $sections = $this->sections($data, $rootReportId, $report->generalInformation());
 
         return new UpdateReportInputDTO(
             id: $data['id'],
@@ -117,14 +119,11 @@ class ReportInputAdapter implements ReportInputAdapterInterface
      *     conclusion: ReportConclusionValueObject|null
      * }
      */
-    private function sections(array $data, ?string $rootReportId = null): array
+    private function sections(array $data, ?string $rootReportId = null, ?ReportGeneralInformationValueObject $generalInformation = null): array
     {
         return [
             'cover' => isset($data['cover']) ? $this->cover($data['cover']) : null,
-            'generalInformation' => isset($data['general_information']) ? new ReportGeneralInformationValueObject(
-                inspectionDate: isset($data['general_information']['inspection_date']) ? new DateTimeImmutable($data['general_information']['inspection_date']) : null,
-                collaborators: $data['general_information']['collaborators'] ?? '',
-            ) : null,
+            'generalInformation' => isset($data['general_information']) ? $this->generalInformation($data['general_information'], $generalInformation) : null,
             'location' => isset($data['location']) ? new ReportLocationValueObject(
                 locationMap: isset($data['location']['location_map']) ? $this->image($data['location']['location_map'], $rootReportId) : null,
                 municipalityInStateMap: isset($data['location']['municipality_in_state_map']) ? $this->image($data['location']['municipality_in_state_map'], $rootReportId) : null,
@@ -138,6 +137,28 @@ class ReportInputAdapter implements ReportInputAdapterInterface
             ) : null,
             'conclusion' => isset($data['conclusion']) ? new ReportConclusionValueObject($data['conclusion']['content'] ?? '') : null,
         ];
+    }
+
+    /** @param GeneralInformationInput $data */
+    private function generalInformation(array $data, ?ReportGeneralInformationValueObject $existing = null): ReportGeneralInformationValueObject
+    {
+        return new ReportGeneralInformationValueObject(
+            inspectionDate: array_key_exists('inspection_date', $data)
+                ? ($data['inspection_date'] === null ? null : new DateTimeImmutable($data['inspection_date']))
+                : $existing?->inspectionDate(),
+            collaborators: array_key_exists('collaborators', $data)
+                ? ($data['collaborators'] ?? '')
+                : ($existing?->collaborators() ?? ''),
+            institutionalRepresentatives: array_key_exists('institutional_representatives', $data)
+                ? array_map(
+                    fn (array $representative): ReportInstitutionalRepresentativeValueObject => new ReportInstitutionalRepresentativeValueObject(
+                        name: $representative['name'],
+                        position: $representative['position'],
+                    ),
+                    $data['institutional_representatives'],
+                )
+                : ($existing?->institutionalRepresentatives() ?? []),
+        );
     }
 
     /** @param CoverInput $data */

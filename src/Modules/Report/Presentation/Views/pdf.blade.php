@@ -83,6 +83,13 @@
         <p class="information"><strong>Município:</strong> {{ $report->cover?->municipality?->name }}</p>
         <p class="information"><strong>Data da vistoria:</strong> {{ $report->generalInformation?->inspectionDate?->format('d/m/Y') }}</p>
         <p class="information"><strong>Colaboradores presentes:</strong> {{ $report->generalInformation?->collaborators }}</p>
+        @if($report->generalInformation?->institutionalRepresentatives)
+            <p class="information"><strong>Representantes institucionais:</strong>
+                @foreach($report->generalInformation->institutionalRepresentatives as $representative)
+                    <br>{{ $representative->name }} — {{ $representative->position }}
+                @endforeach
+            </p>
+        @endif
         <p class="information"><strong>Força:</strong> {{ $report->cover?->force }}</p>
         <p class="information"><strong>Tamanho:</strong> {{ $report->cover?->size }}</p>
         <p class="information"><strong>Tipologia:</strong> {{ $report->cover?->typology }}</p>

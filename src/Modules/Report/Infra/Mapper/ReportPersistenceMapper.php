@@ -12,6 +12,7 @@ use src\Modules\Report\Domain\ValueObject\GeneratedReportValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportConclusionValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportGeneralInformationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportInfrastructureValueObject;
+use src\Modules\Report\Domain\ValueObject\ReportInstitutionalRepresentativeValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportLocationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPhotographicDocumentationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPreImplementationValueObject;
@@ -34,7 +35,7 @@ use src\Modules\Report\Infra\Trait\MapsReportPersistenceSectionsTrait;
  *     createdAt: string,
  *     updatedAt: string,
  *     cover: CoverPayload|null,
- *     generalInformation: array{inspectionDate: string|null, collaborators: string}|null,
+ *     generalInformation: array{inspectionDate: string|null, collaborators: string, institutionalRepresentatives?: list<array{name: string, position: string}>}|null,
  *     location: array{locationMap: ImagePayload|null, municipalityInStateMap: ImagePayload|null}|null,
  *     infrastructure: array<string, string|null>|null,
  *     preImplementation: array{image: ImagePayload|null}|null,
@@ -116,6 +117,13 @@ class ReportPersistenceMapper implements ReportPersistenceMapperInterface
             'generalInformation' => $generalInformation === null ? null : [
                 'inspectionDate' => $generalInformation->inspectionDate() === null ? null : $this->date($generalInformation->inspectionDate()),
                 'collaborators' => $generalInformation->collaborators(),
+                'institutionalRepresentatives' => array_map(
+                    fn (ReportInstitutionalRepresentativeValueObject $representative): array => [
+                        'name' => $representative->name(),
+                        'position' => $representative->position(),
+                    ],
+                    $generalInformation->institutionalRepresentatives(),
+                ),
             ],
             'location' => $location === null ? null : [
                 'locationMap' => $location->locationMap() === null ? null : $this->toImage($location->locationMap()),
@@ -162,6 +170,13 @@ class ReportPersistenceMapper implements ReportPersistenceMapperInterface
             generalInformation: $generalInformation === null ? null : new ReportGeneralInformationValueObject(
                 inspectionDate: $generalInformation['inspectionDate'] === null ? null : new DateTimeImmutable($generalInformation['inspectionDate']),
                 collaborators: $generalInformation['collaborators'],
+                institutionalRepresentatives: array_map(
+                    fn (array $representative): ReportInstitutionalRepresentativeValueObject => new ReportInstitutionalRepresentativeValueObject(
+                        name: $representative['name'],
+                        position: $representative['position'],
+                    ),
+                    $generalInformation['institutionalRepresentatives'] ?? [],
+                ),
             ),
             location: $location === null ? null : new ReportLocationValueObject(
                 locationMap: $location['locationMap'] === null ? null : $this->fromImage($location['locationMap']),

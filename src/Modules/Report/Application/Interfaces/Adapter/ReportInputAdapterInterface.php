@@ -12,12 +12,14 @@ use src\Modules\Report\Application\DTO\UpdateReportInputDTO;
  * @phpstan-type ImageInput array{id?: string, file: FileInput, order: int|string, caption?: string|null}
  * @phpstan-type AttachmentInput array{id?: string, file: FileInput, description?: string|null}
  * @phpstan-type CoverInput array{municipality_id?: int|string|null, force?: string|null, size?: string|null, typology?: string|null, sei_number?: string|null}
+ * @phpstan-type InstitutionalRepresentativeInput array{name: string, position: string}
+ * @phpstan-type GeneralInformationInput array{inspection_date?: string|null, collaborators?: string|null, institutional_representatives?: list<InstitutionalRepresentativeInput>}
  * @phpstan-type AttachmentsInput array{checklist?: array<string, string|null>, municipality_location_map?: AttachmentInput|null, topographic_plan?: AttachmentInput|null, others?: list<AttachmentInput>}
  * @phpstan-type ReportPayload array{
  *     coordination_id?: int|string,
  *     report_type_id?: int|string,
  *     cover?: CoverInput,
- *     general_information?: array{inspection_date?: string|null, collaborators?: string|null},
+ *     general_information?: GeneralInformationInput,
  *     location?: array{location_map?: ImageInput|null, municipality_in_state_map?: ImageInput|null},
  *     infrastructure?: array<string, string|null>,
  *     pre_implementation?: array{image?: ImageInput|null},
@@ -28,7 +30,7 @@ use src\Modules\Report\Application\DTO\UpdateReportInputDTO;
  * @phpstan-type ReportUpdatePayload array{
  *     id: string,
  *     cover?: CoverInput,
- *     general_information?: array{inspection_date?: string|null, collaborators?: string|null},
+ *     general_information?: GeneralInformationInput,
  *     location?: array{location_map?: ImageInput|null, municipality_in_state_map?: ImageInput|null},
  *     infrastructure?: array<string, string|null>,
  *     pre_implementation?: array{image?: ImageInput|null},

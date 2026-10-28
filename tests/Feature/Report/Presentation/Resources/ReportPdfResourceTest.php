@@ -104,9 +104,9 @@ test('presents the report chapters and readable infrastructure and checklist lab
         '9. Anexos',
         '9.1. Checklist do Terreno',
     ]);
-    expect($data['infrastructure']['Rede de água'])->toBe('SIM');
+    expect($data['infrastructure']['Rede de Água'])->toBe('SIM');
     expect($data['infrastructure']['Telefonia'])->toBe('NÃO SE APLICA');
-    expect($data['checklist']['Faixa de domínio ou área não edificável'])->toBe('NÃO');
+    expect($data['checklist']['Terreno em faixa de domínio ou em área não edificante.'])->toBe('NÃO');
 });
 
 test('uses the supplied document pages for the summary and figure list links', function (): void {

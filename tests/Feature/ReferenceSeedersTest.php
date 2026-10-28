@@ -1,6 +1,8 @@
 <?php
 
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\Force\ForceSeeder;
+use Database\Seeders\Sizes\SizeSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -21,7 +23,9 @@ test('default seeding installs the reference data and can be repeated without ch
             ['code' => 'SSP', 'name' => 'Secretaria da Segurança Pública', 'is_active' => true],
         ],
         'sizes' => [
-            ['name' => '1B'], ['name' => '1A'], ['name' => '1'], ['name' => 'Sem Padrão'],
+            ['name' => '1B'], ['name' => '1A'], ['name' => '1'], ['name' => '1B-1B'],
+            ['name' => '1B-1A'], ['name' => '1B-1'], ['name' => '1A-1A'], ['name' => '1A-A'],
+            ['name' => '1-1'], ['name' => '1A-1B'], ['name' => 'SEM PADRÃO'],
         ],
         'coordinations' => [
             ['code' => 'COTEC', 'name' => 'coordenação tecnica', 'is_active' => true],
@@ -67,6 +71,24 @@ test('seeding preserves existing forces and restores other reference data while 
         'id' => $coordinationId, 'code' => 'COTEC', 'name' => 'coordenação tecnica',
         'is_active' => true, 'description' => 'Existing description',
     ]);
+});
+
+test('report catalog seeding preserves existing aliases and names without creating duplicate options', function (): void {
+    $forceId = DB::table('forces')->insertGetId(['code' => 'CBM', 'name' => 'Existing force', 'is_active' => false]);
+    $sizeId = DB::table('sizes')->insertGetId(['name' => 'Sem Padrão']);
+    $combinedSizeId = DB::table('sizes')->insertGetId(['name' => '1b-1a']);
+
+    $this->seed([ForceSeeder::class, SizeSeeder::class]);
+    $this->seed([ForceSeeder::class, SizeSeeder::class]);
+
+    $this->assertDatabaseCount('forces', 6);
+    $this->assertDatabaseCount('sizes', 11);
+    $this->assertDatabaseHas('forces', ['id' => $forceId, 'code' => 'CBM', 'name' => 'Existing force', 'is_active' => false]);
+    $this->assertDatabaseMissing('forces', ['code' => 'BM']);
+    $this->assertDatabaseHas('sizes', ['id' => $sizeId, 'name' => 'Sem Padrão']);
+    $this->assertDatabaseHas('sizes', ['id' => $combinedSizeId, 'name' => '1b-1a']);
+    $this->assertDatabaseMissing('sizes', ['name' => 'SEM PADRÃO']);
+    $this->assertDatabaseMissing('sizes', ['name' => '1B-1A']);
 });
 
 test('default seeding installs 27 active identity territories without duplicating existing records', function () {

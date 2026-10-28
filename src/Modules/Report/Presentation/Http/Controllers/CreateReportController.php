@@ -14,6 +14,7 @@ use src\Modules\Report\Application\Interfaces\Usecase\CreateReportUsecaseInterfa
 use src\Modules\Report\Domain\Exception\DuplicateReportFileException;
 use src\Modules\Report\Domain\Exception\FutureInspectionDateException;
 use src\Modules\Report\Domain\Exception\IncompleteReportException;
+use src\Modules\Report\Domain\Exception\InvalidInstitutionalRepresentativeException;
 use src\Modules\Report\Domain\Exception\InvalidMunicipalityException;
 use src\Modules\Report\Domain\Exception\InvalidReportAttachmentException;
 use src\Modules\Report\Domain\Exception\InvalidReportCollaboratorsException;
@@ -44,6 +45,7 @@ class CreateReportController extends Controller
         try {
             /** @var User $user */
             $user = $request->user();
+
             $result = $this->usecase->__invoke($this->adapter->create($request->validated(), $user->uuid));
 
             return (new ResponseJsend([
@@ -52,7 +54,7 @@ class CreateReportController extends Controller
                 'revision_number' => $result->revisionNumber,
                 'created_at' => $result->createdAt->format(DATE_ATOM),
             ]))->toJsonResponse(201);
-        } catch (InvalidMunicipalityException|InvalidSeiNumberException|InvalidReportTypologyException|FutureInspectionDateException|InvalidReportCollaboratorsException|InvalidReportImageOrderException|InvalidReportImageFormatException|InvalidReportImageCaptionException|ReportImageTooLargeException|TooManyReportFiguresException|DuplicateReportFileException|InvalidReportFileReferenceException|InvalidReportAttachmentException|IncompleteReportException|ReportAttachmentDescriptionRequiredException|InvalidReportConclusionException|InvalidReportRevisionException $e) {
+        } catch (InvalidMunicipalityException|InvalidSeiNumberException|InvalidReportTypologyException|FutureInspectionDateException|InvalidReportCollaboratorsException|InvalidInstitutionalRepresentativeException|InvalidReportImageOrderException|InvalidReportImageFormatException|InvalidReportImageCaptionException|ReportImageTooLargeException|TooManyReportFiguresException|DuplicateReportFileException|InvalidReportFileReferenceException|InvalidReportAttachmentException|IncompleteReportException|ReportAttachmentDescriptionRequiredException|InvalidReportConclusionException|InvalidReportRevisionException $e) {
             $response = new ResponseJsend(
                 status: ResponseJsend::STATUS_ERROR,
                 message: $e->getMessage(),
@@ -61,7 +63,10 @@ class CreateReportController extends Controller
 
             return $response->toJsonResponse(422);
         } catch (ReportAccessDeniedException $e) {
-            return (new ResponseJsend(status: ResponseJsend::STATUS_ERROR, message: $e->getMessage(), code: 403))->toJsonResponse(403);
+            return (new ResponseJsend(
+                status: ResponseJsend::STATUS_ERROR,
+                message: $e->getMessage(),
+                code: 403))->toJsonResponse(403);
         } catch (UniqueConstraintViolationException $e) {
             $response = new ResponseJsend(
                 status: ResponseJsend::STATUS_ERROR,

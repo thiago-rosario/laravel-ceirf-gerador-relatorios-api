@@ -13,6 +13,7 @@ use src\Modules\Report\Application\Interfaces\Usecase\UpdateReportUsecaseInterfa
 use src\Modules\Report\Domain\Exception\DuplicateReportFileException;
 use src\Modules\Report\Domain\Exception\FutureInspectionDateException;
 use src\Modules\Report\Domain\Exception\IncompleteReportException;
+use src\Modules\Report\Domain\Exception\InvalidInstitutionalRepresentativeException;
 use src\Modules\Report\Domain\Exception\InvalidMunicipalityException;
 use src\Modules\Report\Domain\Exception\InvalidReportAttachmentException;
 use src\Modules\Report\Domain\Exception\InvalidReportCollaboratorsException;
@@ -62,7 +63,7 @@ class UpdateReportController extends Controller
             );
 
             return $response->toJsonResponse(409);
-        } catch (InvalidMunicipalityException|InvalidSeiNumberException|InvalidReportTypologyException|FutureInspectionDateException|InvalidReportCollaboratorsException|InvalidReportImageOrderException|InvalidReportImageFormatException|InvalidReportImageCaptionException|ReportImageTooLargeException|TooManyReportFiguresException|DuplicateReportFileException|InvalidReportFileReferenceException|InvalidReportAttachmentException|IncompleteReportException|ReportAttachmentDescriptionRequiredException|InvalidReportConclusionException|InvalidReportRevisionException $e) {
+        } catch (InvalidMunicipalityException|InvalidSeiNumberException|InvalidReportTypologyException|FutureInspectionDateException|InvalidReportCollaboratorsException|InvalidInstitutionalRepresentativeException|InvalidReportImageOrderException|InvalidReportImageFormatException|InvalidReportImageCaptionException|ReportImageTooLargeException|TooManyReportFiguresException|DuplicateReportFileException|InvalidReportFileReferenceException|InvalidReportAttachmentException|IncompleteReportException|ReportAttachmentDescriptionRequiredException|InvalidReportConclusionException|InvalidReportRevisionException $e) {
             $response = new ResponseJsend(
                 status: ResponseJsend::STATUS_ERROR,
                 message: $e->getMessage(),

@@ -51,7 +51,17 @@ class UpdateReportEloquentRepository
             }
 
             $reportToStore = $this->service->preserveUploadedImages($report, $previousReport->uploadedImages());
-            $model->fill($this->service->attributes($reportToStore));
+            $attributes = $this->service->attributes($reportToStore);
+
+            if ($model->force_id !== null && $previousReport->cover()?->force() === $reportToStore->cover()?->force()) {
+                $attributes['force_id'] = $model->force_id;
+            }
+
+            if ($model->size_id !== null && $previousReport->cover()?->size() === $reportToStore->cover()?->size()) {
+                $attributes['size_id'] = $model->size_id;
+            }
+
+            $model->fill($attributes);
             $dirty = $model->getDirty();
 
             if ($dirty !== [] && Report::query()->whereKey($model->id)->where('status', ReportStatusEnum::DRAFT->value)->update($dirty) !== 1) {

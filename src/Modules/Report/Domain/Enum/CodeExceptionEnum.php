@@ -52,4 +52,6 @@ enum CodeExceptionEnum: int
 
     case INVALID_REPORT_ATTACHMENT = 2023;
 
+    case INVALID_INSTITUCIONAL_REPRESENTATIVE = 2024;
+
 }

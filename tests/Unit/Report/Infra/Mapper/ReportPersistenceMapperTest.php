@@ -16,11 +16,58 @@ use src\Modules\Report\Domain\ValueObject\ReportConclusionValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportCoverValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportGeneralInformationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportInfrastructureValueObject;
+use src\Modules\Report\Domain\ValueObject\ReportInstitutionalRepresentativeValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportLocationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPhotographicDocumentationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPreImplementationValueObject;
 use src\Modules\Report\Infra\Mapper\ReportPersistenceMapper;
 use Tests\Fixtures\ReportApplicationFixtures;
+
+test('restores multiple institutional representatives and their positions after JSON storage', function (): void {
+    $report = new ReportEntity(
+        createdBy: '550e8400-e29b-41d4-a716-446655440000',
+        generalInformation: new ReportGeneralInformationValueObject(
+            inspectionDate: new DateTimeImmutable('2020-01-01'),
+            collaborators: 'Equipe técnica',
+            institutionalRepresentatives: [
+                new ReportInstitutionalRepresentativeValueObject('Ana Souza', 'Secretária'),
+                new ReportInstitutionalRepresentativeValueObject('José Santos', 'Diretor'),
+            ],
+        ),
+    );
+    $mapper = new ReportPersistenceMapper;
+
+    $payload = json_decode(json_encode($mapper->toPayload($report), JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+    $restored = $mapper->fromPayload($payload);
+    $information = (new ReportDataMapperService)->map($restored)->generalInformation;
+
+    expect($payload['generalInformation']['institutionalRepresentatives'])->toBe([
+        ['name' => 'Ana Souza', 'position' => 'Secretária'],
+        ['name' => 'José Santos', 'position' => 'Diretor'],
+    ]);
+    expect($information?->collaborators)->toBe('Equipe técnica');
+    expect($information?->inspectionDate?->format('Y-m-d'))->toBe('2020-01-01');
+    expect($information?->institutionalRepresentatives)->toHaveCount(2);
+    expect($information?->institutionalRepresentatives[0]->name)->toBe('Ana Souza');
+    expect($information?->institutionalRepresentatives[0]->position)->toBe('Secretária');
+    expect($information?->institutionalRepresentatives[1]->name)->toBe('José Santos');
+    expect($information?->institutionalRepresentatives[1]->position)->toBe('Diretor');
+});
+
+test('restores older generated snapshots without institutional representatives', function (): void {
+    $original = ReportApplicationFixtures::generatedReport();
+    $mapper = new ReportPersistenceMapper;
+    $payload = $mapper->toPayload($original);
+    unset($payload['generalInformation']['institutionalRepresentatives']);
+
+    $restored = $mapper->fromPayload($payload);
+
+    expect($restored->generalInformation()?->institutionalRepresentatives())->toBe([]);
+    expect($restored->generalInformation()?->collaborators())->toBe('Ana Silva e João Santos');
+    expect($restored->generalInformation()?->inspectionDate()?->format('Y-m-d'))->toBe('2020-01-01');
+    expect($restored->isGenerated())->toBeTrue();
+    expect($restored->generatedDocument()?->fileName())->toBe('SALVADOR_PM_1B_DELEGACIA.pdf');
+});
 
 test('restores absent draft sections and preserves precise dates after JSON storage', function (): void {
     $report = new ReportEntity(

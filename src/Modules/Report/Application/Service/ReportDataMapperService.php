@@ -16,6 +16,7 @@ use src\Modules\Report\Application\DTO\ReportFileReferenceDataDTO;
 use src\Modules\Report\Application\DTO\ReportGeneralInformationDataDTO;
 use src\Modules\Report\Application\DTO\ReportImageDataDTO;
 use src\Modules\Report\Application\DTO\ReportInfrastructureDataDTO;
+use src\Modules\Report\Application\DTO\ReportInstitutionalRepresentativeDataDTO;
 use src\Modules\Report\Application\DTO\ReportLocationDataDTO;
 use src\Modules\Report\Application\DTO\ReportPhotographicDocumentationDataDTO;
 use src\Modules\Report\Application\DTO\ReportPreImplementationDataDTO;
@@ -32,6 +33,7 @@ use src\Modules\Report\Domain\ValueObject\ReportCoverValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportFileReferenceValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportGeneralInformationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportInfrastructureValueObject;
+use src\Modules\Report\Domain\ValueObject\ReportInstitutionalRepresentativeValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportLocationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPhotographicDocumentationValueObject;
 use src\Modules\Report\Domain\ValueObject\ReportPreImplementationValueObject;
@@ -104,6 +106,13 @@ class ReportDataMapperService implements ReportDataMapperServiceInterface
         return new ReportGeneralInformationDataDTO(
             inspectionDate: $generalInformation->inspectionDate(),
             collaborators: $generalInformation->collaborators(),
+            institutionalRepresentatives: array_map(
+                fn (ReportInstitutionalRepresentativeValueObject $representative): ReportInstitutionalRepresentativeDataDTO => new ReportInstitutionalRepresentativeDataDTO(
+                    name: $representative->name(),
+                    position: $representative->position(),
+                ),
+                $generalInformation->institutionalRepresentatives(),
+            ),
         );
     }
 

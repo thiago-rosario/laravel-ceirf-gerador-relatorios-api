@@ -2,18 +2,18 @@
     <thead>
         <tr>
             <th class="question">Item verificado</th>
-            <th class="answer">SIM</th>
-            <th class="answer">NÃO</th>
-            <th class="answer">NÃO SE APLICA</th>
+            @foreach($answerOptions as $option)
+                <th class="answer">{{ $option }}</th>
+            @endforeach
         </tr>
     </thead>
     <tbody>
         @foreach($answers as $question => $answer)
             <tr>
                 <td>{{ $question }}</td>
-                <td class="answer">{{ $answer === 'SIM' ? 'X' : '' }}</td>
-                <td class="answer">{{ $answer === 'NÃO' ? 'X' : '' }}</td>
-                <td class="answer">{{ $answer === 'NÃO SE APLICA' ? 'X' : '' }}</td>
+                @foreach($answerOptions as $option)
+                    <td class="answer">{{ $answer === $option ? 'X' : '' }}</td>
+                @endforeach
             </tr>
         @endforeach
     </tbody>

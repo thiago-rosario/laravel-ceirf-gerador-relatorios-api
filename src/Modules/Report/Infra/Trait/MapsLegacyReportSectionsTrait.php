@@ -30,7 +30,7 @@ trait MapsLegacyReportSectionsTrait
                 name: (string) $row->municipality_name,
                 stateCode: (string) $row->municipality_state_code,
             ),
-            force: $row->force_code === null ? null : ForceEnum::from($row->force_code === 'BM' ? 'CBM' : (string) $row->force_code),
+            force: $row->force_code === null ? null : ForceEnum::fromDatabase((string) $row->force_code),
             size: $row->size_name === null ? null : ReportSizeEnum::from(mb_strtoupper((string) $row->size_name)),
             typology: (string) ($row->typology ?? ''),
             seiNumber: $row->sei_number === null ? null : new SeiNumberValueObject((string) $row->sei_number),

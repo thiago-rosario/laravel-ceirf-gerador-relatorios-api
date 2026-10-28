@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace src\Modules\Report\Presentation\Http\Requests;
 
 use Illuminate\Validation\Validator;
+use src\Modules\Report\Application\Catalog\Interfaces\Repository\ReportCatalogRepositoryInterface;
 use Stringable;
 
 /** @phpstan-import-type ReportUpdatePayload from \src\Modules\Report\Application\Interfaces\Adapter\ReportInputAdapterInterface */
@@ -22,9 +23,9 @@ class UpdateReportRequest extends ReportPayloadRequest
     }
 
     /** @return array<string, list<string|Stringable>> */
-    public function rules(): array
+    public function rules(ReportCatalogRepositoryInterface $catalogs): array
     {
-        return ['id' => ['required', 'uuid'], ...$this->sectionRules()];
+        return ['id' => ['required', 'uuid'], ...$this->sectionRules($catalogs)];
     }
 
     /** @return list<callable(Validator): void> */

@@ -7,11 +7,11 @@ namespace src\Modules\Report\Infra\Service;
 use Illuminate\Support\Facades\DB;
 use src\Modules\Attachment\Application\Interfaces\Service\ReportMediaRegistryServiceInterface;
 use src\Modules\Identity\Model\User;
+use src\Modules\Report\Application\Catalog\Interfaces\Repository\ReportCatalogRepositoryInterface;
 use src\Modules\Report\Application\Interfaces\Mapper\ReportPersistenceMapperInterface;
 use src\Modules\Report\Application\Interfaces\Service\ReportPersistenceServiceInterface;
 use src\Modules\Report\Domain\Entity\ReportEntity;
 use src\Modules\Report\Domain\Entity\ReportImageEntity;
-use src\Modules\Report\Domain\Enum\ForceEnum;
 use src\Modules\Report\Domain\Validation\ReportMediaValidation;
 
 class ReportPersistenceService implements ReportPersistenceServiceInterface
@@ -19,6 +19,7 @@ class ReportPersistenceService implements ReportPersistenceServiceInterface
     public function __construct(
         private readonly ReportPersistenceMapperInterface $mapper,
         private readonly ReportMediaRegistryServiceInterface $mediaRegistry,
+        private readonly ReportCatalogRepositoryInterface $catalogs,
     ) {}
 
     public function authorId(ReportEntity $report): int
@@ -30,10 +31,10 @@ class ReportPersistenceService implements ReportPersistenceServiceInterface
     public function attributes(ReportEntity $report): array
     {
         $cover = $report->cover();
-        $forceCode = $cover?->force() === ForceEnum::CBM ? 'BM' : $cover?->force()?->value;
-        $forceId = $forceCode === null ? null : DB::table('forces')->where('code', $forceCode)->value('id');
-        $sizeName = $cover?->size()?->value;
-        $sizeId = $sizeName === null ? null : DB::table('sizes')->whereRaw('LOWER(name) = ?', [mb_strtolower($sizeName)])->value('id');
+        $force = $cover?->force();
+        $forceId = $force === null ? null : $this->catalogs->forceId($force);
+        $size = $cover?->size();
+        $sizeId = $size === null ? null : $this->catalogs->typologyId($size);
 
         return [
             ...$this->mapper->toAttributes($report),

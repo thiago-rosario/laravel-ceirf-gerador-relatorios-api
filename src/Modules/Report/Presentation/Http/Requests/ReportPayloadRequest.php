@@ -8,11 +8,15 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use src\Modules\Identity\Domain\Enum\UserRoleEnum;
 use src\Modules\Identity\Model\User;
-use src\Modules\Report\Application\Catalog\Interfaces\Repository\ReportCatalogRepositoryInterface;
+use src\Modules\Report\Application\Catalog\DTO\ListReportForcesInputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportTypologiesInputDTO;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportForcesUsecaseInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportTypologiesUsecaseInterface;
 use src\Modules\Report\Application\Interfaces\Service\ReportAccessServiceInterface;
 use src\Modules\Report\Domain\Catalog\ReportCatalog;
 use src\Modules\Report\Domain\Enum\ChecklistAnswerEnum;
 use src\Modules\Report\Domain\Validation\ReportImageValidation;
+use src\Modules\Report\Presentation\Catalog\Exception\ForceNotFoundException;
 use Stringable;
 
 /** @phpstan-import-type ReportPayload from \src\Modules\Report\Application\Interfaces\Adapter\ReportInputAdapterInterface */
@@ -28,7 +32,7 @@ abstract class ReportPayloadRequest extends FormRequest
     }
 
     /** @return array<string, list<string|Stringable>> */
-    protected function sectionRules(ReportCatalogRepositoryInterface $catalogs): array
+    protected function sectionRules(ListReportForcesUsecaseInterface $forces, ListReportTypologiesUsecaseInterface $typologies): array
     {
         $infrastructureFields = array_keys(ReportCatalog::INFRASTRUCTURE);
         $checklistFields = array_keys(ReportCatalog::CHECKLIST);
@@ -43,8 +47,8 @@ abstract class ReportPayloadRequest extends FormRequest
             'coordination_id' => ['prohibited'],
             'cover' => ['sometimes', 'array:municipality_id,force,size,typology,sei_number'],
             'cover.municipality_id' => ['sometimes', 'nullable', 'integer', 'min:1', Rule::exists('municipalities', 'id')->where('state_code', 'BA')->where('is_active', true)],
-            'cover.force' => ['sometimes', 'nullable', 'string', Rule::in($this->filled('cover.force') ? array_column($catalogs->forces(), 'key') : [])],
-            'cover.size' => ['sometimes', 'nullable', 'string', Rule::in($this->filled('cover.size') ? array_column($catalogs->typologies(), 'key') : [])],
+            'cover.force' => ['sometimes', 'nullable', 'string', Rule::in($this->filled('cover.force') ? $this->availableForceCodes($forces) : [])],
+            'cover.size' => ['sometimes', 'nullable', 'string', Rule::in($this->filled('cover.size') ? array_column($typologies->__invoke(new ListReportTypologiesInputDTO)->items, 'code') : [])],
             'cover.typology' => ['sometimes', 'nullable', 'string', 'max:100'],
             'cover.sei_number' => ['sometimes', 'nullable', 'string', 'max:80'],
             'general_information' => ['sometimes', 'array:inspection_date,collaborators,institutional_representatives'],
@@ -80,6 +84,16 @@ abstract class ReportPayloadRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /** @return list<string> */
+    private function availableForceCodes(ListReportForcesUsecaseInterface $forces): array
+    {
+        try {
+            return array_column($forces->__invoke(new ListReportForcesInputDTO)->items, 'code');
+        } catch (ForceNotFoundException) {
+            return [];
+        }
     }
 
     /** @return array<string, list<string>> */

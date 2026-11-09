@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace src\Modules\Report\Application\Catalog\Interfaces\Usecase;
 
+use src\Modules\Report\Application\Catalog\DTO\ListReportAnswersInputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportAnswersOutputDTO;
+
 interface ListReportAnswersUsecaseInterface
 {
-    /** @return list<array{key: string, label: string}> */
-    public function __invoke(): array;
+    public function __invoke(ListReportAnswersInputDTO $input): ListReportAnswersOutputDTO;
 }

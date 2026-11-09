@@ -4,20 +4,26 @@ declare(strict_types=1);
 
 namespace src\Modules\Report\Application\Catalog\Usecase;
 
+use src\Modules\Report\Application\Catalog\DTO\ListReportChecklistInputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportChecklistOutputDTO;
 use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportChecklistUsecaseInterface;
 use src\Modules\Report\Domain\Catalog\ReportCatalog;
 
 class ListReportChecklistUsecase implements ListReportChecklistUsecaseInterface
 {
-    /** @return list<array{key: string, label: string}> */
-    public function __invoke(): array
+    public function __invoke(ListReportChecklistInputDTO $input): ListReportChecklistOutputDTO
     {
-        $options = [];
+        $items = [];
 
-        foreach (ReportCatalog::CHECKLIST as $key => $label) {
-            $options[] = ['key' => $key, 'label' => $label];
+        foreach (ReportCatalog::CHECKLIST as $code => $name) {
+            $items[] = [
+                'code' => $code,
+                'name' => $name,
+            ];
         }
 
-        return $options;
+        return new ListReportChecklistOutputDTO(
+            items: $items,
+        );
     }
 }

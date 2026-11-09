@@ -8,37 +8,20 @@ use Illuminate\Support\Facades\DB;
 use src\Modules\Report\Application\Catalog\Interfaces\Repository\ReportCatalogRepositoryInterface;
 use src\Modules\Report\Domain\Enum\ForceEnum;
 use src\Modules\Report\Domain\Enum\ReportSizeEnum;
+use stdClass;
 
 class ReportCatalogRepository implements ReportCatalogRepositoryInterface
 {
-    /** @return list<array{key: string, label: string}> */
+    /** @return list<stdClass> */
     public function forces(): array
     {
-        $codes = DB::table('forces')->pluck('code')->all();
-        $options = [];
-
-        foreach (ForceEnum::cases() as $force) {
-            if (in_array($force->databaseCode(), $codes, true) || in_array($force->value, $codes, true)) {
-                $options[] = ['key' => $force->value, 'label' => $force->value];
-            }
-        }
-
-        return $options;
+        return array_values(DB::table('forces')->orderBy('id')->get(['id', 'code', 'name'])->all());
     }
 
-    /** @return list<array{key: string, label: string}> */
+    /** @return list<stdClass> */
     public function typologies(): array
     {
-        $names = DB::table('sizes')->pluck('name')->map(fn (string $name): string => mb_strtoupper($name))->all();
-        $options = [];
-
-        foreach (ReportSizeEnum::cases() as $size) {
-            if (in_array($size->value, $names, true)) {
-                $options[] = ['key' => $size->value, 'label' => $size->value];
-            }
-        }
-
-        return $options;
+        return array_values(DB::table('sizes')->orderBy('id')->get(['id', 'name'])->all());
     }
 
     public function forceId(ForceEnum $force): ?int

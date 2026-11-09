@@ -6,13 +6,14 @@ namespace src\Modules\Report\Application\Catalog\Interfaces\Repository;
 
 use src\Modules\Report\Domain\Enum\ForceEnum;
 use src\Modules\Report\Domain\Enum\ReportSizeEnum;
+use stdClass;
 
 interface ReportCatalogRepositoryInterface
 {
-    /** @return list<array{key: string, label: string}> */
+    /** @return list<stdClass> */
     public function forces(): array;
 
-    /** @return list<array{key: string, label: string}> */
+    /** @return list<stdClass> */
     public function typologies(): array;
 
     public function forceId(ForceEnum $force): ?int;

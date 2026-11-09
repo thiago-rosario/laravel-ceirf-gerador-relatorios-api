@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+use src\Modules\Report\Application\Catalog\Interfaces\Adapter\ListReportAnswersDataAdapterInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Adapter\ListReportChecklistDataAdapterInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Adapter\ListReportForcesDataAdapterInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Adapter\ListReportInfrastructureDataAdapterInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Adapter\ListReportTypologiesDataAdapterInterface;
 use src\Modules\Report\Application\Catalog\Interfaces\Repository\ReportCatalogRepositoryInterface;
 use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportAnswersUsecaseInterface;
 use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportChecklistUsecaseInterface;
@@ -54,6 +59,11 @@ use src\Modules\Report\Application\Usecase\UpdateReportUsecase;
 use src\Modules\Report\Domain\Repository\ReportRepositoryInterface;
 use src\Modules\Report\Infra\Adapter\ReportGeneratorAdapter;
 use src\Modules\Report\Infra\Adapter\ReportQueryResultAdapter;
+use src\Modules\Report\Infra\Catalog\Adapter\ListReportAnswersDataAdapter;
+use src\Modules\Report\Infra\Catalog\Adapter\ListReportChecklistDataAdapter;
+use src\Modules\Report\Infra\Catalog\Adapter\ListReportForcesDataAdapter;
+use src\Modules\Report\Infra\Catalog\Adapter\ListReportInfrastructureDataAdapter;
+use src\Modules\Report\Infra\Catalog\Adapter\ListReportTypologiesDataAdapter;
 use src\Modules\Report\Infra\Catalog\Repository\ReportCatalogRepository;
 use src\Modules\Report\Infra\Mapper\LegacyReportQueryMapper;
 use src\Modules\Report\Infra\Mapper\ReportChecklistMapper;
@@ -67,6 +77,11 @@ test('resolves report contracts with their complete dependency graphs', function
     expect($resolved)->toBeInstanceOf($implementation);
 })->with([
     'catalog repository' => [ReportCatalogRepositoryInterface::class, ReportCatalogRepository::class],
+    'force catalog adapter' => [ListReportForcesDataAdapterInterface::class, ListReportForcesDataAdapter::class],
+    'typology catalog adapter' => [ListReportTypologiesDataAdapterInterface::class, ListReportTypologiesDataAdapter::class],
+    'answer catalog adapter' => [ListReportAnswersDataAdapterInterface::class, ListReportAnswersDataAdapter::class],
+    'infrastructure catalog adapter' => [ListReportInfrastructureDataAdapterInterface::class, ListReportInfrastructureDataAdapter::class],
+    'checklist catalog adapter' => [ListReportChecklistDataAdapterInterface::class, ListReportChecklistDataAdapter::class],
     'force catalog' => [ListReportForcesUsecaseInterface::class, ListReportForcesUsecase::class],
     'typology catalog' => [ListReportTypologiesUsecaseInterface::class, ListReportTypologiesUsecase::class],
     'answer catalog' => [ListReportAnswersUsecaseInterface::class, ListReportAnswersUsecase::class],

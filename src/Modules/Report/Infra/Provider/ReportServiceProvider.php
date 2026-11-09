@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace src\Modules\Report\Infra\Provider;
 
 use Illuminate\Support\ServiceProvider;
+use src\Modules\Report\Application\Catalog\Interfaces\Adapter\ListReportAnswersDataAdapterInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Adapter\ListReportChecklistDataAdapterInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Adapter\ListReportForcesDataAdapterInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Adapter\ListReportInfrastructureDataAdapterInterface;
+use src\Modules\Report\Application\Catalog\Interfaces\Adapter\ListReportTypologiesDataAdapterInterface;
 use src\Modules\Report\Application\Catalog\Interfaces\Repository\ReportCatalogRepositoryInterface;
 use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportAnswersUsecaseInterface;
 use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportChecklistUsecaseInterface;
@@ -68,6 +73,11 @@ use src\Modules\Report\Domain\Repository\ReportRepositoryInterface;
 use src\Modules\Report\Infra\Adapter\ReportGeneratorAdapter;
 use src\Modules\Report\Infra\Adapter\ReportInputAdapter;
 use src\Modules\Report\Infra\Adapter\ReportQueryResultAdapter;
+use src\Modules\Report\Infra\Catalog\Adapter\ListReportAnswersDataAdapter;
+use src\Modules\Report\Infra\Catalog\Adapter\ListReportChecklistDataAdapter;
+use src\Modules\Report\Infra\Catalog\Adapter\ListReportForcesDataAdapter;
+use src\Modules\Report\Infra\Catalog\Adapter\ListReportInfrastructureDataAdapter;
+use src\Modules\Report\Infra\Catalog\Adapter\ListReportTypologiesDataAdapter;
 use src\Modules\Report\Infra\Catalog\Repository\ReportCatalogRepository;
 use src\Modules\Report\Infra\Mapper\LegacyReportQueryMapper;
 use src\Modules\Report\Infra\Mapper\ReportChecklistMapper;
@@ -88,6 +98,11 @@ class ReportServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(ReportCatalogRepositoryInterface::class, ReportCatalogRepository::class);
+        $this->app->bind(ListReportForcesDataAdapterInterface::class, ListReportForcesDataAdapter::class);
+        $this->app->bind(ListReportTypologiesDataAdapterInterface::class, ListReportTypologiesDataAdapter::class);
+        $this->app->bind(ListReportAnswersDataAdapterInterface::class, ListReportAnswersDataAdapter::class);
+        $this->app->bind(ListReportInfrastructureDataAdapterInterface::class, ListReportInfrastructureDataAdapter::class);
+        $this->app->bind(ListReportChecklistDataAdapterInterface::class, ListReportChecklistDataAdapter::class);
         $this->app->bind(ListReportForcesUsecaseInterface::class, ListReportForcesUsecase::class);
         $this->app->bind(ListReportTypologiesUsecaseInterface::class, ListReportTypologiesUsecase::class);
         $this->app->bind(ListReportAnswersUsecaseInterface::class, ListReportAnswersUsecase::class);

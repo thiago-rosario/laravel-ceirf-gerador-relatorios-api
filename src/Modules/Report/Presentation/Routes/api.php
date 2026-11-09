@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use src\Modules\Identity\Presentation\Http\Middleware\EnsurePasswordIsChanged;
-use src\Modules\Report\Presentation\Catalog\Controller\ListReportAnswersController;
-use src\Modules\Report\Presentation\Catalog\Controller\ListReportChecklistController;
-use src\Modules\Report\Presentation\Catalog\Controller\ListReportForcesController;
-use src\Modules\Report\Presentation\Catalog\Controller\ListReportInfrastructureController;
-use src\Modules\Report\Presentation\Catalog\Controller\ListReportTypologiesController;
+use src\Modules\Report\Presentation\Catalog\Http\Controller\ListReportAnswersController;
+use src\Modules\Report\Presentation\Catalog\Http\Controller\ListReportChecklistController;
+use src\Modules\Report\Presentation\Catalog\Http\Controller\ListReportForcesController;
+use src\Modules\Report\Presentation\Catalog\Http\Controller\ListReportInfrastructureController;
+use src\Modules\Report\Presentation\Catalog\Http\Controller\ListReportTypologiesController;
 use src\Modules\Report\Presentation\Http\Controllers\CountAllReportsController;
 use src\Modules\Report\Presentation\Http\Controllers\CountReportsByMonthController;
 use src\Modules\Report\Presentation\Http\Controllers\CreateReportController;

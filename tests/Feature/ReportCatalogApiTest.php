@@ -11,6 +11,16 @@ use Illuminate\Support\Facades\Route;
 use Mockery\MockInterface;
 use src\Modules\Identity\Domain\Enum\UserRoleEnum;
 use src\Modules\Identity\Model\User;
+use src\Modules\Report\Application\Catalog\DTO\ListReportAnswersInputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportAnswersOutputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportChecklistInputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportChecklistOutputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportForcesInputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportForcesOutputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportInfrastructureInputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportInfrastructureOutputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportTypologiesInputDTO;
+use src\Modules\Report\Application\Catalog\DTO\ListReportTypologiesOutputDTO;
 use src\Modules\Report\Application\Catalog\Interfaces\Repository\ReportCatalogRepositoryInterface;
 use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportAnswersUsecaseInterface;
 use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportChecklistUsecaseInterface;
@@ -18,6 +28,12 @@ use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportForcesUs
 use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportInfrastructureUsecaseInterface;
 use src\Modules\Report\Application\Catalog\Interfaces\Usecase\ListReportTypologiesUsecaseInterface;
 use src\Modules\Report\Model\Report;
+use src\Modules\Report\Presentation\Catalog\Exception\ForceNotFoundException;
+use src\Modules\Report\Presentation\Catalog\Exception\ListReportAnswersException;
+use src\Modules\Report\Presentation\Catalog\Exception\ListReportChecklistException;
+use src\Modules\Report\Presentation\Catalog\Exception\ListReportForcesException;
+use src\Modules\Report\Presentation\Catalog\Exception\ListReportInfrastructureException;
+use src\Modules\Report\Presentation\Catalog\Exception\ListReportTypologiesException;
 
 use function Pest\Laravel\mock;
 
@@ -38,23 +54,32 @@ dataset('report catalog endpoints', [
     'checklist' => ['/api/reports/catalogs/checklist'],
 ]);
 
-test('catalog controllers execute their injected usecase contracts', function (string $catalog, string $contract): void {
+test('catalog controllers execute their injected usecase contracts', function (string $catalog, string $contract, string $inputClass, string $outputClass): void {
     $user = User::factory()->create();
     $token = reportCatalogAccessToken($user);
     $options = [['key' => 'contract-option', 'label' => 'Option supplied by the usecase contract']];
-    mock($contract, function (MockInterface $mock) use ($options): void {
-        $mock->shouldReceive('__invoke')->once()->andReturn($options);
+    $items = [['code' => 'contract-option', 'name' => 'Option supplied by the usecase contract']];
+    if ($catalog === 'forces') {
+        $options[0]['label'] = 'contract-option';
+        $options[0]['name'] = 'Name supplied by the usecase contract';
+        $items = [['id' => 1, 'code' => 'contract-option', 'name' => 'Name supplied by the usecase contract']];
+    } elseif ($catalog === 'typologies') {
+        $items[0]['id'] = 1;
+    }
+    $result = new $outputClass(items: $items);
+    mock($contract, function (MockInterface $mock) use ($result, $inputClass): void {
+        $mock->shouldReceive('__invoke')->once()->with(Mockery::type($inputClass))->andReturn($result);
     });
 
     $response = $this->withToken($token)->getJson('/api/reports/catalogs/'.$catalog);
 
     $response->assertOk()->assertExactJson(['status' => 'success', 'data' => [$catalog => $options]]);
 })->with([
-    'forces' => ['forces', ListReportForcesUsecaseInterface::class],
-    'typologies' => ['typologies', ListReportTypologiesUsecaseInterface::class],
-    'answers' => ['answers', ListReportAnswersUsecaseInterface::class],
-    'infrastructure' => ['infrastructure', ListReportInfrastructureUsecaseInterface::class],
-    'checklist' => ['checklist', ListReportChecklistUsecaseInterface::class],
+    'forces' => ['forces', ListReportForcesUsecaseInterface::class, ListReportForcesInputDTO::class, ListReportForcesOutputDTO::class],
+    'typologies' => ['typologies', ListReportTypologiesUsecaseInterface::class, ListReportTypologiesInputDTO::class, ListReportTypologiesOutputDTO::class],
+    'answers' => ['answers', ListReportAnswersUsecaseInterface::class, ListReportAnswersInputDTO::class, ListReportAnswersOutputDTO::class],
+    'infrastructure' => ['infrastructure', ListReportInfrastructureUsecaseInterface::class, ListReportInfrastructureInputDTO::class, ListReportInfrastructureOutputDTO::class],
+    'checklist' => ['checklist', ListReportChecklistUsecaseInterface::class, ListReportChecklistInputDTO::class, ListReportChecklistOutputDTO::class],
 ]);
 
 test('returns 401 when a report catalog is requested without authentication', function (string $uri): void {
@@ -115,7 +140,7 @@ test('preserves all public identifiers and their original order in the individua
         $response->assertExactJson(['status' => 'success', 'data' => [$catalog => $options[$catalog]]]);
         expect(array_column($options[$catalog], 'key'))->toBe($keys);
         foreach ($options[$catalog] as $option) {
-            expect(array_keys($option))->toBe(['key', 'label']);
+            expect(array_keys($option))->toBe($catalog === 'forces' ? ['key', 'label', 'name'] : ['key', 'label']);
             expect($option['label'])->toBeString()->not->toBeEmpty();
         }
     }
@@ -127,6 +152,34 @@ test('preserves all public identifiers and their original order in the individua
 test('registers only the five explicit catalog routes without an aggregated or generic catalog endpoint', function (): void {
     expect(Route::has('reports.form-options'))->toBeFalse();
     expect(Route::has('reports.catalogs.list'))->toBeFalse();
+});
+
+test('retrieves stored force records without applying the public catalog rules in the repository', function (): void {
+    DB::table('forces')->insert([
+        ['id' => 20, 'code' => 'BM', 'name' => 'Bombeiro cadastrado', 'is_active' => false],
+        ['id' => 10, 'code' => 'UNKNOWN', 'name' => 'Outra instituição', 'is_active' => true],
+    ]);
+
+    $records = $this->app->make(ReportCatalogRepositoryInterface::class)->forces();
+
+    expect(array_map(fn (stdClass $force): array => (array) $force, $records))->toBe([
+        ['id' => 10, 'code' => 'UNKNOWN', 'name' => 'Outra instituição'],
+        ['id' => 20, 'code' => 'BM', 'name' => 'Bombeiro cadastrado'],
+    ]);
+});
+
+test('retrieves stored typologies without normalizing or selecting public options in the repository', function (): void {
+    DB::table('sizes')->insert([
+        ['id' => 20, 'name' => 'sem padrão'],
+        ['id' => 10, 'name' => 'desconhecido'],
+    ]);
+
+    $records = $this->app->make(ReportCatalogRepositoryInterface::class)->typologies();
+
+    expect(array_map(fn (stdClass $typology): array => (array) $typology, $records))->toBe([
+        ['id' => 10, 'name' => 'desconhecido'],
+        ['id' => 20, 'name' => 'sem padrão'],
+    ]);
 });
 
 test('lists only stored supported forces and sizes independently of insertion order and preserves inactive legacy forces', function (): void {
@@ -142,7 +195,9 @@ test('lists only stored supported forces and sizes independently of insertion or
 
     $this->withToken($token)->getJson('/api/reports/catalogs/forces')->assertOk()
         ->assertExactJson(['status' => 'success', 'data' => ['forces' => [
-            ['key' => 'PM', 'label' => 'PM'], ['key' => 'CBM', 'label' => 'CBM'], ['key' => 'SSP', 'label' => 'SSP'],
+            ['key' => 'PM', 'label' => 'PM', 'name' => 'Militar'],
+            ['key' => 'CBM', 'label' => 'CBM', 'name' => 'Bombeiro'],
+            ['key' => 'SSP', 'label' => 'SSP', 'name' => 'Secretaria'],
         ]]]);
     $this->withToken($token)->getJson('/api/reports/catalogs/typologies')->assertOk()
         ->assertExactJson(['status' => 'success', 'data' => ['typologies' => [
@@ -150,12 +205,34 @@ test('lists only stored supported forces and sizes independently of insertion or
         ]]]);
 });
 
-test('does not fabricate database options when the reference tables are empty', function (): void {
+test('returns a single public force option with its stored name when database aliases are available', function (array $forces, string $expectedName): void {
+    DB::table('forces')->insert($forces);
     $user = User::factory()->create();
     $token = reportCatalogAccessToken($user);
 
-    $this->withToken($token)->getJson('/api/reports/catalogs/forces')->assertOk()
-        ->assertExactJson(['status' => 'success', 'data' => ['forces' => []]]);
+    $response = $this->withToken($token)->getJson('/api/reports/catalogs/forces');
+
+    $response->assertOk()->assertExactJson(['status' => 'success', 'data' => ['forces' => [
+        ['key' => 'CBM', 'label' => 'CBM', 'name' => $expectedName],
+    ]]]);
+})->with([
+    'public code without the database alias' => [[['code' => 'CBM', 'name' => 'Nome cadastrado no código público']], 'Nome cadastrado no código público'],
+    'database alias inserted after the public code' => [[
+        ['code' => 'CBM', 'name' => 'Nome do código público'],
+        ['code' => 'BM', 'name' => 'Nome do código de persistência'],
+    ], 'Nome do código de persistência'],
+    'database alias inserted before the public code' => [[
+        ['code' => 'BM', 'name' => 'Nome do código de persistência'],
+        ['code' => 'CBM', 'name' => 'Nome do código público'],
+    ], 'Nome do código de persistência'],
+]);
+
+test('preserves each database catalog response when the reference tables are empty', function (): void {
+    $user = User::factory()->create();
+    $token = reportCatalogAccessToken($user);
+
+    $this->withToken($token)->getJson('/api/reports/catalogs/forces')->assertBadRequest()
+        ->assertExactJson(['status' => 'error', 'data' => [], 'message' => 'Força não encontrada !', 'code' => 2302]);
     $this->withToken($token)->getJson('/api/reports/catalogs/typologies')->assertOk()
         ->assertExactJson(['status' => 'success', 'data' => ['typologies' => []]]);
 });
@@ -166,6 +243,28 @@ test('returns 404 for an unknown report catalog', function (): void {
 
     $this->withToken($token)->getJson('/api/reports/catalogs/unknown')->assertNotFound();
 });
+
+test('returns 400 with the catalog exception message and code when listing fails', function (string $catalog, string $contract, string $inputClass, string $exceptionClass, string $expectedMessage, int $expectedCode): void {
+    $user = User::factory()->create();
+    $token = reportCatalogAccessToken($user);
+    mock($contract, function (MockInterface $mock) use ($exceptionClass, $inputClass): void {
+        $mock->shouldReceive('__invoke')->once()->with(Mockery::type($inputClass))
+            ->andThrow(new $exceptionClass);
+    });
+
+    $response = $this->withToken($token)->getJson('/api/reports/catalogs/'.$catalog);
+
+    $response->assertBadRequest()->assertExactJson([
+        'status' => 'error', 'data' => [], 'message' => $expectedMessage, 'code' => $expectedCode,
+    ]);
+})->with([
+    'force listing exception' => ['forces', ListReportForcesUsecaseInterface::class, ListReportForcesInputDTO::class, ListReportForcesException::class, 'Erro ao listar as forças!', 2301],
+    'force not found exception' => ['forces', ListReportForcesUsecaseInterface::class, ListReportForcesInputDTO::class, ForceNotFoundException::class, 'Força não encontrada !', 2302],
+    'answer listing exception' => ['answers', ListReportAnswersUsecaseInterface::class, ListReportAnswersInputDTO::class, ListReportAnswersException::class, 'Erro ao listar as respostas!', 2303],
+    'checklist listing exception' => ['checklist', ListReportChecklistUsecaseInterface::class, ListReportChecklistInputDTO::class, ListReportChecklistException::class, 'Erro ao listar o checklist!', 2304],
+    'infrastructure listing exception' => ['infrastructure', ListReportInfrastructureUsecaseInterface::class, ListReportInfrastructureInputDTO::class, ListReportInfrastructureException::class, 'Erro ao listar a infraestrutura!', 2305],
+    'typology listing exception' => ['typologies', ListReportTypologiesUsecaseInterface::class, ListReportTypologiesInputDTO::class, ListReportTypologiesException::class, 'Erro ao listar as tipologias!', 2306],
+]);
 
 test('reports catalog failures using the existing generic 500 response', function (string $uri, string $method): void {
     $user = User::factory()->create();
@@ -183,6 +282,26 @@ test('reports catalog failures using the existing generic 500 response', functio
 })->with([
     'forces' => ['/api/reports/catalogs/forces', 'forces'],
     'typologies' => ['/api/reports/catalogs/typologies', 'typologies'],
+]);
+
+test('reports static catalog failures using the generic 500 response', function (string $catalog, string $contract): void {
+    $user = User::factory()->create();
+    $token = reportCatalogAccessToken($user);
+    Exceptions::fake();
+    mock($contract, function (MockInterface $mock): void {
+        $mock->shouldReceive('__invoke')->once()->andThrow(new RuntimeException('Private catalog details'));
+    });
+
+    $response = $this->withToken($token)->getJson('/api/reports/catalogs/'.$catalog);
+
+    $response->assertInternalServerError()->assertExactJson([
+        'status' => 'error', 'data' => [], 'message' => 'An unexpected error occurred', 'code' => 500,
+    ]);
+    Exceptions::assertReported(RuntimeException::class);
+})->with([
+    'answers' => ['answers', ListReportAnswersUsecaseInterface::class],
+    'infrastructure' => ['infrastructure', ListReportInfrastructureUsecaseInterface::class],
+    'checklist' => ['checklist', ListReportChecklistUsecaseInterface::class],
 ]);
 
 test('creates updates and retrieves report values supplied by the catalogs while preserving relational aliases', function (): void {
